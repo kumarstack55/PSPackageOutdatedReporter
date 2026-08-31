@@ -1,4 +1,7 @@
-﻿[CmdletBinding()]
+﻿#Requires -Version 5.1
+#Requires -PSEdition Desktop
+
+[CmdletBinding()]
 param(
     [ValidateRange(1, 100)]
     [int]$MaxUpgradeVersions = 10,
@@ -16,6 +19,27 @@ param(
     [switch]$ClearCache
 )
 
+function Get-RelativeReleaseDateDisplay {
+    param([Parameter(Mandatory)][datetime]$ReleasedAt)
+
+    $releaseDate = $ReleasedAt.Date
+    $daysFromToday = ([datetime]::Today - $releaseDate).Days
+    if ($daysFromToday -gt 0) {
+        return "$daysFromToday`d ago"
+    }
+
+    if ($daysFromToday -lt 0) {
+        return "in $(-$daysFromToday)`d"
+    }
+
+    $hoursFromNow = [math]::Floor(([datetime]::Now - $ReleasedAt).TotalHours)
+    if ($hoursFromNow -ge 0) {
+        return "$hoursFromNow`h ago"
+    }
+
+    return "in $(-$hoursFromNow)`h"
+}
+
 class PackageVersion {
     [string]$Version
     [object]$ReleasedAt
@@ -31,7 +55,11 @@ class PackageVersion {
 
     [string] GetReleaseDateDisplay() {
         if ($null -ne $this.ReleasedAt) {
-            return ([datetime]$this.ReleasedAt).ToString('yyyy-MM-dd')
+            $releaseTimestamp = [datetime]$this.ReleasedAt
+            $releaseDate = $releaseTimestamp.Date
+            $relativeDate = Get-RelativeReleaseDateDisplay -ReleasedAt $releaseTimestamp
+
+            return "$($releaseDate.ToString('yyyy-MM-dd')) ($relativeDate)"
         }
 
         return "Unknown ($($this.ReleaseDateStatus))"
@@ -97,7 +125,21 @@ function Get-ReleaseDateCache {
     }
 
     try {
-        $cache = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+        $cachedJson = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $cache = @{
+            schemaVersion = [int]$cachedJson.schemaVersion
+            entries = @{}
+        }
+        foreach ($property in $cachedJson.entries.PSObject.Properties) {
+            $entry = $property.Value
+            $cache.entries[$property.Name] = @{
+                version = [string]$entry.version
+                releasedAt = [string]$entry.releasedAt
+                status = [string]$entry.status
+                metadataSource = [string]$entry.metadataSource
+                cachedAt = [string]$entry.cachedAt
+            }
+        }
         if ($cache.schemaVersion -ne 1 -or $null -eq $cache.entries) {
             throw 'Unsupported cache schema.'
         }
@@ -469,6 +511,7 @@ function Write-OutdatedPackageReport {
             @{ Name = 'Source'; Expression = { $_.CandidateSource } },
             @{ Name = 'Installed'; Expression = { "$($_.InstalledVersion.Version) [$($_.InstalledVersion.GetReleaseDateDisplay())]" } },
             @{ Name = 'Latest'; Expression = { "$($_.LatestVersion.Version) [$($_.LatestVersion.GetReleaseDateDisplay())]" } } |
+        Select-Object -Property Manager, Name, Installed, Latest |
         Format-Table -AutoSize -Wrap |
         Out-Host
 

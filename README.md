@@ -12,7 +12,7 @@ The script reports only. It never performs an upgrade.
 ## Requirements
 
 - Windows with WinGet and/or Chocolatey available.
-- PowerShell 7 or later.
+- Windows PowerShell 5.1.
 - The `Microsoft.WinGet.Client` module when reporting WinGet packages.
 - Network access to `raw.githubusercontent.com` and `community.chocolatey.org` for release dates.
 
