@@ -242,7 +242,11 @@ function Resolve-WinGetReleaseDate {
         $status = 'UnsupportedSource'
     } else {
         try {
-            $manifest = Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            $manifest = & {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            }
+
             $releaseDateMatch = [regex]::Match($manifest.Content, '(?m)^ReleaseDate:\s*["'']?(?<value>\d{4}-\d{2}-\d{2})')
             if ($releaseDateMatch.Success) {
                 $parsedDate = [datetime]::MinValue
@@ -302,7 +306,10 @@ function Resolve-ChocolateyReleaseDate {
             $escapedId = $PackageId.Replace("'", "''")
             $escapedVersion = $Version.Replace("'", "''")
             $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
-            $response = Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            $response = & {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            }
             $xml = [xml]$response.Content
             $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
             $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
