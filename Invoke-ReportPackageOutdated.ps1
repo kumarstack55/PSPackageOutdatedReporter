@@ -524,8 +524,10 @@ function Write-OutdatedPackageReport {
 
         foreach ($target in $package.UpgradeTargets) {
             Write-Host -NoNewline '  '
+            Write-Host -NoNewline -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
+            Write-Host -NoNewline ' --> '
             Write-Host -NoNewline -ForegroundColor Yellow "$($target.PackageVersion.Version) [$($target.PackageVersion.GetReleaseDateDisplay())]"
-            Write-Host "  $($target.Command)"
+            Write-Host ": $($target.Command)"
         }
     }
 }
