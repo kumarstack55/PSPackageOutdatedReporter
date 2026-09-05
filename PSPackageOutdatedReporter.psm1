@@ -9,11 +9,14 @@ Export-ModuleMember -Function @(
     'Get-WinGetManifestUrl',
     'Resolve-WinGetReleaseDate',
     'Resolve-ChocolateyReleaseDate',
+    'Resolve-ScoopReleaseDate',
     'ConvertTo-PowerShellSingleQuotedArgument',
     'New-WinGetUpgradeCommand',
     'New-ChocolateyUpgradeCommand',
+    'New-ScoopUpgradeCommand',
     'Get-WinGetUpgradeablePackages',
     'Get-ChocolateyAvailableVersions',
     'Get-ChocolateyUpgradeablePackages',
+    'Get-ScoopUpgradeablePackages',
     'Write-OutdatedPackageReport'
 )

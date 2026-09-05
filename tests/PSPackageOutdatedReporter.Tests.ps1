@@ -20,6 +20,20 @@ Describe 'PSPackageOutdatedReporter' {
             Should -Be "choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"
     }
 
+    It 'builds a Scoop upgrade command' {
+        New-ScoopUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
+            Should -Be "scoop update 'O''Reilly.App'"
+    }
+
+    It 'marks Scoop release dates as unpublished and caches the result' {
+        $cache = @{ schemaVersion = 1; entries = @{} }
+
+        $result = Resolve-ScoopReleaseDate -PackageId 'demo' -Version '1.2.3' -CandidateSource 'main' -Cache $cache -CacheTtlHours 24
+
+        $result.ReleaseDateStatus | Should -Be 'NotPublished'
+        $cache.entries.Count | Should -Be 1
+    }
+
     It 'round-trips the release date cache' {
         $cachePath = Join-Path $TestDrive 'release-date-cache.json'
         $cache = @{ schemaVersion = 1; entries = @{ 'key' = @{ version = '1.2.3'; releasedAt = '2026-01-02'; status = 'Found'; metadataSource = 'test'; cachedAt = '2026-01-02T00:00:00Z' } } }

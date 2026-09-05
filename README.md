@@ -1,6 +1,6 @@
 # PSPackageOutdatedReporter
 
-Reports installed packages that WinGet or Chocolatey can upgrade. For each package it prints:
+Reports installed packages that WinGet, Chocolatey, or Scoop can upgrade. For each package it prints:
 
 - Package manager, package name, and candidate source.
 - Installed version and its manifest release date when available.
@@ -11,7 +11,7 @@ The script reports only. It never performs an upgrade.
 
 ## Requirements
 
-- Windows with WinGet and/or Chocolatey available.
+- Windows with WinGet, Chocolatey, and/or Scoop available.
 - Windows PowerShell 5.1.
 - The `Microsoft.WinGet.Client` module when reporting WinGet packages.
 - Network access to `raw.githubusercontent.com` and `community.chocolatey.org` for release dates.
@@ -28,11 +28,12 @@ Install-Module Microsoft.WinGet.Client -Scope CurrentUser
 .\Invoke-ReportPackageOutdated.ps1
 .\Invoke-ReportPackageOutdated.ps1 -PackageManager Chocolatey
 .\Invoke-ReportPackageOutdated.ps1 -PackageManager WinGet, Chocolatey
+.\Invoke-ReportPackageOutdated.ps1 -PackageManager Scoop
 .\Invoke-ReportPackageOutdated.ps1 -Source winget -MaxUpgradeVersions 1
 .\Invoke-ReportPackageOutdated.ps1 -ClearCache
 ```
 
-`-PackageManager` defaults to `WinGet, Chocolatey`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
+`-PackageManager` defaults to `WinGet, Chocolatey, Scoop`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
 
 ## Tests
 
@@ -55,6 +56,8 @@ The user-facing interface remains `Invoke-ReportPackageOutdated.ps1`; the module
 WinGet does not provide version release dates through `Microsoft.WinGet.Client`. For packages resolved from the official `winget` source, the script retrieves the optional `ReleaseDate` field from the matching version manifest in `microsoft/winget-pkgs`.
 
 For Chocolatey packages, the script reads the `Published` field from the Chocolatey Community Package Repository OData endpoint. `choco outdated` does not identify the source that supplied an individual package, so Chocolatey results are treated as the public `chocolatey` source. A package supplied only by a private feed may therefore show `LookupFailed` or a date from a public package with the same ID and version. Private-feed source attribution is not implemented.
+
+Scoop packages are discovered by parsing `scoop status`; the bucket name is obtained from `scoop info`. Scoop manifests do not provide a reliable release date, so Scoop versions are reported as `NotPublished`.
 
 Dates are deliberately not inferred from Git commits, repository registration dates, or installer file timestamps. The report therefore shows one of these states when no date is available:
 
@@ -84,7 +87,3 @@ The default persistent cache is:
 ```
 
 It is a single JSON file with a versioned schema and entries keyed by `manager|candidateSource|packageId|version`. Positive and negative release-date results are cached. Writes use a temporary file followed by replacement to avoid partial JSON files.
-
-## Roadmap
-
-The report models are package-manager neutral. Scoop will be added as its own discovery and release-date resolver implementation; its source rules and metadata APIs remain manager-specific.

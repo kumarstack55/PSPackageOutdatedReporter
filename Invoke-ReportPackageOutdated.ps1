@@ -6,8 +6,8 @@ param(
     [ValidateRange(1, 100)]
     [int]$MaxUpgradeVersions = 10,
 
-    [ValidateSet('WinGet', 'Chocolatey')]
-    [string[]]$PackageManager = @('WinGet', 'Chocolatey'),
+    [ValidateSet('WinGet', 'Chocolatey', 'Scoop')]
+    [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop'),
 
     [string]$Source,
 
@@ -364,6 +364,47 @@ function New-ChocolateyUpgradeCommand {
     return "choco upgrade $(ConvertTo-PowerShellSingleQuotedArgument $PackageId) --version $(ConvertTo-PowerShellSingleQuotedArgument $Version) --yes"
 }
 
+function Resolve-ScoopReleaseDate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$CandidateSource,
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][int]$CacheTtlHours
+    )
+
+    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'scoop' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
+    $entry = $Cache.entries[$cacheKey]
+    if ($null -ne $entry) {
+        $cachedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
+            return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
+        }
+    }
+
+    $metadataSource = 'Scoop manifest'
+    $status = 'NotPublished'
+    $Cache.entries[$cacheKey] = @{
+        version = $Version
+        releasedAt = $null
+        status = $status
+        metadataSource = $metadataSource
+        cachedAt = [datetime]::UtcNow.ToString('o')
+    }
+
+    return [PackageVersion]::new($Version, $null, $status, $metadataSource)
+}
+
+function New-ScoopUpgradeCommand {
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version
+    )
+
+    return "scoop update $(ConvertTo-PowerShellSingleQuotedArgument $PackageId)"
+}
+
 function Get-WinGetUpgradeablePackages {
     [CmdletBinding()]
     param(
@@ -501,6 +542,87 @@ function Get-ChocolateyUpgradeablePackages {
     return $reportPackages.ToArray()
 }
 
+function Get-ScoopUpgradeablePackages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][int]$CacheTtlHours,
+        [Parameter(Mandatory)][int]$MaxUpgradeVersions,
+        [string]$SourceFilter
+    )
+
+    if ($null -eq (Get-Command scoop -ErrorAction SilentlyContinue)) {
+        Write-Warning 'Scoop is not installed or is not on PATH.'
+        return @()
+    }
+
+    try {
+        $statusLines = @(scoop status 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            throw "scoop status exited with code $LASTEXITCODE."
+        }
+    } catch {
+        Write-Warning "Unable to query Scoop packages: $($_.Exception.Message)"
+        return @()
+    }
+
+    $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    foreach ($line in $statusLines) {
+        if ($null -ne $line.PSObject.Properties['Name'] -and
+            $null -ne $line.PSObject.Properties['Installed Version'] -and
+            $null -ne $line.PSObject.Properties['Latest Version']) {
+            $packageId = [string]$line.Name
+            $installedVersionText = [string]$line.'Installed Version'
+            $availableVersionText = [string]$line.'Latest Version'
+        } else {
+            if ($line -notmatch '^\s*(?<packageId>\S+)\s+(?<installedVersion>\S+)\s+(?<availableVersion>\S+)(?:\s+.*)?$' -or
+                $Matches.packageId -eq 'Name' -or
+                $Matches.installedVersion -eq 'Installed') {
+                continue
+            }
+
+            $packageId = $Matches.packageId
+            $installedVersionText = $Matches.installedVersion
+            $availableVersionText = $Matches.availableVersion
+        }
+        $candidateSource = ''
+        try {
+            $infoLines = @(scoop info $packageId 2>$null)
+            $sourceInfo = $infoLines | Where-Object { $null -ne $_.PSObject.Properties['Source'] } | Select-Object -First 1
+            if ($null -ne $sourceInfo) {
+                $candidateSource = [string]$sourceInfo.Source
+            } else {
+                $sourceLine = $infoLines | Where-Object { $_ -match '^\s*Source\s*:\s*(?<source>\S+)' } | Select-Object -First 1
+                if ($null -ne $sourceLine -and $sourceLine -match '^\s*Source\s*:\s*(?<source>\S+)') {
+                    $candidateSource = $Matches.source
+                }
+            }
+        } catch {
+            Write-Verbose "Failed to retrieve Scoop source for ${packageId}: $($_.Exception.Message)"
+        }
+        if ([string]::IsNullOrWhiteSpace($candidateSource)) {
+            $candidateSource = 'unknown'
+        }
+
+        if ([string]::IsNullOrWhiteSpace($packageId) -or
+            [string]::IsNullOrWhiteSpace($installedVersionText) -or
+            [string]::IsNullOrWhiteSpace($availableVersionText) -or
+            $installedVersionText -eq $availableVersionText) {
+            continue
+        }
+        if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
+            continue
+        }
+
+        $installedVersion = Resolve-ScoopReleaseDate -PackageId $packageId -Version $installedVersionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
+        $availableVersion = Resolve-ScoopReleaseDate -PackageId $packageId -Version $availableVersionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
+        $target = [UpgradeTarget]::new($availableVersion, (New-ScoopUpgradeCommand -PackageId $packageId -Version $availableVersionText))
+        $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $availableVersion, @($target)))
+    }
+
+    return $reportPackages.ToArray()
+}
+
 function Write-OutdatedPackageReport {
     [CmdletBinding()]
     param([Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages)
@@ -549,6 +671,11 @@ if ($MyInvocation.InvocationName -ne '.') {
     }
     if ($PackageManager -contains 'Chocolatey') {
         foreach ($package in @(Get-ChocolateyUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
+            $packages.Add($package)
+        }
+    }
+    if ($PackageManager -contains 'Scoop') {
+        foreach ($package in @(Get-ScoopUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
             $packages.Add($package)
         }
     }
