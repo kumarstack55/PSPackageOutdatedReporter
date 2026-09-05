@@ -539,18 +539,21 @@ function Write-OutdatedPackageReport {
     }
 }
 
-$cache = Get-ReleaseDateCache -Path $CachePath -Clear:$ClearCache
-$packages = [System.Collections.Generic.List[SoftwarePackage]]::new()
-if ($PackageManager -contains 'WinGet') {
-    foreach ($package in @(Get-WinGetUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
-        $packages.Add($package)
+if ($MyInvocation.InvocationName -ne '.') {
+    $cache = Get-ReleaseDateCache -Path $CachePath -Clear:$ClearCache
+    $packages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    if ($PackageManager -contains 'WinGet') {
+        foreach ($package in @(Get-WinGetUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
+            $packages.Add($package)
+        }
     }
-}
-if ($PackageManager -contains 'Chocolatey') {
-    foreach ($package in @(Get-ChocolateyUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
-        $packages.Add($package)
+    if ($PackageManager -contains 'Chocolatey') {
+        foreach ($package in @(Get-ChocolateyUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
+            $packages.Add($package)
+        }
     }
+
+    Save-ReleaseDateCache -Cache $cache -Path $CachePath
+    Write-OutdatedPackageReport -Packages $packages.ToArray()
+    $global:LASTEXITCODE = 0
 }
-Save-ReleaseDateCache -Cache $cache -Path $CachePath
-Write-OutdatedPackageReport -Packages $packages.ToArray()
-$global:LASTEXITCODE = 0

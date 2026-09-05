@@ -34,6 +34,22 @@ Install-Module Microsoft.WinGet.Client -Scope CurrentUser
 
 `-PackageManager` defaults to `WinGet, Chocolatey`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
 
+## Tests
+
+The internal functions are exposed through `PSPackageOutdatedReporter.psm1`. Importing the module does not run a report, so the functions can be tested without invoking WinGet, Chocolatey, or the network.
+
+Install Pester 5 if needed, then run the tests from Windows PowerShell 5.1:
+
+```powershell
+Install-Module Pester -Scope CurrentUser -MinimumVersion 5.0
+
+Invoke-Pester .\tests
+# or
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Invoke-Pester -Path .\tests"
+```
+
+The user-facing interface remains `Invoke-ReportPackageOutdated.ps1`; the module is an internal testability boundary.
+
 ## Release dates
 
 WinGet does not provide version release dates through `Microsoft.WinGet.Client`. For packages resolved from the official `winget` source, the script retrieves the optional `ReleaseDate` field from the matching version manifest in `microsoft/winget-pkgs`.
