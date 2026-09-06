@@ -31,6 +31,10 @@ Install-Module Microsoft.WinGet.Client -Scope CurrentUser
 .\Invoke-ReportPackageOutdated.ps1 -PackageManager Scoop
 .\Invoke-ReportPackageOutdated.ps1 -Source winget -MaxUpgradeVersions 1
 .\Invoke-ReportPackageOutdated.ps1 -ClearCache
+
+# or
+
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\Invoke-ReportPackageOutdated.ps1"
 ```
 
 `-PackageManager` defaults to `WinGet, Chocolatey, Scoop`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
