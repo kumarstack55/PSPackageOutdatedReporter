@@ -809,8 +809,9 @@ function Write-OutdatedPackageReport {
             @{ Name = 'InstalledDate'; Expression = { $_.InstalledVersion.GetReleaseDateDisplay() } },
             @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
             @{ Name = 'LatestDate'; Expression = { $_.LatestVersion.GetReleaseDateDisplay() } } |
-        Select-Object -Property Manager, Name, InstalledVersion, InstalledDate, LatestVersion, LatestDate |
-        Format-Table -AutoSize -Wrap |
+        Select-Object -Property Manager, Name, Source, InstalledVersion, InstalledDate, LatestVersion, LatestDate |
+        Format-Table -AutoSize |
+        Out-String -Width 4096 |
         Out-Host
 
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
