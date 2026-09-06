@@ -364,6 +364,50 @@ function New-ChocolateyUpgradeCommand {
     return "choco upgrade $(ConvertTo-PowerShellSingleQuotedArgument $PackageId) --version $(ConvertTo-PowerShellSingleQuotedArgument $Version) --yes"
 }
 
+function Get-ScoopManifestReleaseDate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [string]$BucketName
+    )
+
+    $manifestSearchPath = if (-not [string]::IsNullOrWhiteSpace($BucketName) -and $BucketName -ine 'unknown') {
+        "$env:USERPROFILE\scoop\buckets\$BucketName\bucket\${PackageId}.json"
+    } else {
+        "$env:USERPROFILE\scoop\buckets\*\bucket\${PackageId}.json"
+    }
+
+    $manifestItem = Get-ChildItem $manifestSearchPath -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $manifestItem) {
+        return $null
+    }
+
+    $repositoryPath = Split-Path $manifestItem.DirectoryName -Parent
+    $jsonPath = "bucket/${PackageId}.json"
+
+    $hashDateArray = @(git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $hashDateArray.Count -eq 0) {
+        return $null
+    }
+
+    foreach ($hashDate in $hashDateArray) {
+        $commitHash, $ymdString = $hashDate -split "`t", 2
+        $gitShowOutputJson = git -C $repositoryPath show "${commitHash}:${jsonPath}" 2>$null
+        if (-not $gitShowOutputJson) {
+            continue
+        }
+
+        $data = $gitShowOutputJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+        # each commit corresponds to a version bump, so the first match found (newest-first) is the publish date
+        if ($null -ne $data -and [string]$data.version -eq $Version) {
+            return [datetime]::ParseExact($ymdString, 'yyyy-MM-dd', $null)
+        }
+    }
+
+    return $null
+}
+
 function Resolve-ScoopReleaseDate {
     [CmdletBinding()]
     param(
@@ -383,17 +427,36 @@ function Resolve-ScoopReleaseDate {
         }
     }
 
-    $metadataSource = 'Scoop manifest'
+    $metadataSource = 'Scoop manifest (git history)'
     $status = 'NotPublished'
+    $releasedAt = $null
+
+    if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
+        $metadataSource = 'None'
+        $status = 'UnsupportedSource'
+    } else {
+        try {
+            $releasedAt = Get-ScoopManifestReleaseDate -PackageId $PackageId -Version $Version -BucketName $CandidateSource
+            if ($null -eq $releasedAt) {
+                $status = 'NotPublished'
+            } else {
+                $status = 'Found'
+            }
+        } catch {
+            $status = 'LookupFailed'
+            Write-Verbose "Failed to retrieve Scoop release date for $PackageId ${Version}: $($_.Exception.Message)"
+        }
+    }
+
     $Cache.entries[$cacheKey] = @{
         version = $Version
-        releasedAt = $null
+        releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
         status = $status
         metadataSource = $metadataSource
         cachedAt = [datetime]::UtcNow.ToString('o')
     }
 
-    return [PackageVersion]::new($Version, $null, $status, $metadataSource)
+    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
 }
 
 function New-ScoopUpgradeCommand {
