@@ -701,9 +701,11 @@ function Write-OutdatedPackageReport {
         Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
             @{ Name = 'Name'; Expression = { "$($_.DisplayName) ($($_.PackageId))" } },
             @{ Name = 'Source'; Expression = { $_.CandidateSource } },
-            @{ Name = 'Installed'; Expression = { "$($_.InstalledVersion.Version) [$($_.InstalledVersion.GetReleaseDateDisplay())]" } },
-            @{ Name = 'Latest'; Expression = { "$($_.LatestVersion.Version) [$($_.LatestVersion.GetReleaseDateDisplay())]" } } |
-        Select-Object -Property Manager, Name, Installed, Latest |
+            @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
+            @{ Name = 'InstalledDate'; Expression = { $_.InstalledVersion.GetReleaseDateDisplay() } },
+            @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
+            @{ Name = 'LatestDate'; Expression = { $_.LatestVersion.GetReleaseDateDisplay() } } |
+        Select-Object -Property Manager, Name, InstalledVersion, InstalledDate, LatestVersion, LatestDate |
         Format-Table -AutoSize -Wrap |
         Out-Host
 
