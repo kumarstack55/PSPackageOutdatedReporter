@@ -9,6 +9,16 @@ Reports installed packages that WinGet, Chocolatey, or Scoop can upgrade. For ea
 
 The script reports only. It never performs an upgrade.
 
+## Screenshots
+
+You can check for upgradeable packages.
+
+![upgradeable-packages screenshot](images/upgradeable-packages.png)
+
+You can see how to upgrade packages.
+
+![package screenshot](images/package.png)
+
 ## Requirements
 
 - Windows with WinGet, Chocolatey, and/or Scoop available.
