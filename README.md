@@ -22,6 +22,37 @@ Install the module for the current user:
 Install-Module Microsoft.WinGet.Client -Scope CurrentUser
 ```
 
+## Installation
+
+Clone the repository and create a shortcut in the current user's Startup folder. The shortcut runs the report at sign-in and keeps the PowerShell window open for 60 seconds after the report finishes.
+
+Run the following in Windows PowerShell 5.1. Replace the repository URL if your repository is hosted elsewhere.
+
+```powershell
+$repoPath = Join-Path $HOME 'PSPackageOutdatedReporter'
+git clone https://github.com/wabik/PSPackageOutdatedReporter.git $repoPath
+Set-Location $repoPath
+
+$startupPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
+$shortcutPath = Join-Path $startupPath 'PSPackageOutdatedReporter.lnk'
+$scriptPath = Join-Path $repoPath 'Invoke-ReportPackageOutdated.ps1'
+$powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = $powershellPath
+$shortcut.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& ''{0}''; Start-Sleep -Seconds 60"' -f $scriptPath
+$shortcut.WorkingDirectory = $repoPath
+$shortcut.Description = 'Report outdated packages'
+$shortcut.Save()
+```
+
+To remove the automatic execution, delete the shortcut:
+
+```powershell
+Remove-Item (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup\PSPackageOutdatedReporter.lnk')
+```
+
 ## Usage
 
 ```powershell
