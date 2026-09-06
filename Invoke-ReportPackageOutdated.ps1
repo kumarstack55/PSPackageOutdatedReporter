@@ -16,7 +16,10 @@ param(
 
     [string]$CachePath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'PSPackageOutdatedReporter\release-date-cache.json'),
 
-    [switch]$ClearCache
+    [switch]$ClearCache,
+
+    [ValidateRange(0, 8760)]
+    [int]$CooldownHours = (7 * 24)
 )
 
 function Get-RelativeReleaseDateDisplay {
@@ -63,6 +66,29 @@ class PackageVersion {
         }
 
         return "Unknown ($($this.ReleaseDateStatus))"
+    }
+
+    [bool] IsInCooldown([int]$CooldownHours) {
+        if ($CooldownHours -le 0 -or $null -eq $this.ReleasedAt) {
+            return $false
+        }
+
+        return ([datetime]::Now - [datetime]$this.ReleasedAt).TotalHours -lt $CooldownHours
+    }
+
+    [string] GetCooldownRemainingDisplay([int]$CooldownHours) {
+        $remainingHours = $CooldownHours - ([datetime]::Now - [datetime]$this.ReleasedAt).TotalHours
+        if ($remainingHours -le 0) {
+            return '0h'
+        }
+
+        $remainingDays = [math]::Floor($remainingHours / 24)
+        $remainingHoursPart = [math]::Ceiling($remainingHours % 24)
+        if ($remainingDays -gt 0) {
+            return "${remainingDays}d ${remainingHoursPart}h"
+        }
+
+        return "${remainingHoursPart}h"
     }
 }
 
@@ -688,7 +714,10 @@ function Get-ScoopUpgradeablePackages {
 
 function Write-OutdatedPackageReport {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages)
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
+        [int]$CooldownHours = (7 * 24)
+    )
 
     if ($Packages.Count -eq 0) {
         Write-Host -ForegroundColor Green 'No upgradeable packages found.'
@@ -720,7 +749,13 @@ function Write-OutdatedPackageReport {
             Write-Host -NoNewline '  '
             Write-Host -NoNewline -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
             Write-Host -NoNewline ' --> '
-            Write-Host -NoNewline -ForegroundColor Yellow "$($target.PackageVersion.Version) [$($target.PackageVersion.GetReleaseDateDisplay())]"
+
+            $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
+            $targetColor = if ($isInCooldown) { 'DarkGray' } else { 'Yellow' }
+            Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version) [$($target.PackageVersion.GetReleaseDateDisplay())]"
+            if ($isInCooldown) {
+                Write-Host -NoNewline -ForegroundColor DarkGray " 🧊 cooldown ($($target.PackageVersion.GetCooldownRemainingDisplay($CooldownHours)) remaining)"
+            }
             Write-Host ": $($target.Command)"
         }
     }
@@ -746,6 +781,6 @@ if ($MyInvocation.InvocationName -ne '.') {
     }
 
     Save-ReleaseDateCache -Cache $cache -Path $CachePath
-    Write-OutdatedPackageReport -Packages $packages.ToArray()
+    Write-OutdatedPackageReport -Packages $packages.ToArray() -CooldownHours $CooldownHours
     $global:LASTEXITCODE = 0
 }
