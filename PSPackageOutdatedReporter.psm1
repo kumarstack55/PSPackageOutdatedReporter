@@ -12,6 +12,8 @@ Export-ModuleMember -Function @(
     'Get-ScoopManifestReleaseDate',
     'Resolve-ScoopReleaseDate',
     'ConvertTo-PowerShellSingleQuotedArgument',
+    'Get-NormalizedPackageVersion',
+    'Test-IsOlderPackageVersion',
     'New-WinGetUpgradeCommand',
     'New-ChocolateyUpgradeCommand',
     'New-ScoopUpgradeCommand',
