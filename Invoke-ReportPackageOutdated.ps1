@@ -751,7 +751,7 @@ function Write-OutdatedPackageReport {
             Write-Host -NoNewline ' --> '
 
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
-            $targetColor = if ($isInCooldown) { 'DarkGray' } else { 'Yellow' }
+            $targetColor = if ($isInCooldown) { 'DarkGray' } else { 'Green' }
             Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version) [$($target.PackageVersion.GetReleaseDateDisplay())]"
             if ($isInCooldown) {
                 Write-Host -NoNewline -ForegroundColor DarkGray " 🧊 cooldown ($($target.PackageVersion.GetCooldownRemainingDisplay($CooldownHours)) remaining)"
