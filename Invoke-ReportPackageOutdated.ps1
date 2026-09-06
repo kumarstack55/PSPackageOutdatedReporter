@@ -43,6 +43,12 @@ function Get-RelativeReleaseDateDisplay {
     return "in $(-$hoursFromNow)`h"
 }
 
+function Write-StageStatus {
+    param([Parameter(Mandatory)][string]$Message)
+
+    Write-Host -ForegroundColor Cyan "[$(Get-Date -Format 'HH:mm:ss')] $Message"
+}
+
 class PackageVersion {
     [string]$Version
     [object]$ReleasedAt
@@ -541,18 +547,22 @@ function Get-WinGetUpgradeablePackages {
     }
 
     try {
+        Write-StageStatus 'WinGet: loading Microsoft.WinGet.Client module...'
         Import-Module $module.Path -ErrorAction Stop
+        Write-StageStatus 'WinGet: querying installed packages...'
         $installedPackages = Get-WinGetPackage -ErrorAction Stop
     } catch {
         Write-Warning "Unable to query WinGet packages: $($_.Exception.Message)"
         return @()
     }
 
+    $updatablePackages = @($installedPackages | Where-Object { $_.IsUpdateAvailable })
+    Write-StageStatus "WinGet: found $($updatablePackages.Count) package(s) with updates available."
+
     $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
-    foreach ($installedPackage in $installedPackages) {
-        if (-not $installedPackage.IsUpdateAvailable) {
-            continue
-        }
+    $packageIndex = 0
+    foreach ($installedPackage in $updatablePackages) {
+        $packageIndex++
 
         $candidateSource = [string]$installedPackage.Source
         if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
@@ -565,6 +575,7 @@ function Get-WinGetUpgradeablePackages {
             continue
         }
 
+        Write-StageStatus "WinGet ($packageIndex/$($updatablePackages.Count)): resolving release dates for $($installedPackage.Id)..."
         $installedVersion = Resolve-WinGetReleaseDate -PackageId $installedPackage.Id -Version ([string]$installedPackage.InstalledVersion) -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
         $targets = [System.Collections.Generic.List[UpgradeTarget]]::new()
         foreach ($version in $versions) {
@@ -627,6 +638,7 @@ function Get-ChocolateyUpgradeablePackages {
     }
 
     try {
+        Write-StageStatus 'Chocolatey: querying outdated packages...'
         $lines = @(choco outdated --no-color --limit-output 2>$null)
         if ($LASTEXITCODE -ne 0) {
             throw "choco outdated exited with code $LASTEXITCODE."
@@ -636,16 +648,27 @@ function Get-ChocolateyUpgradeablePackages {
         return @()
     }
 
-    $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $outdatedEntries = [System.Collections.Generic.List[string[]]]::new()
     foreach ($line in $lines) {
         $parts = $line -split '\|', 4
         if ($parts.Count -ne 4 -or [string]::IsNullOrWhiteSpace($parts[0])) {
             continue
         }
 
+        $outdatedEntries.Add($parts)
+    }
+
+    Write-StageStatus "Chocolatey: found $($outdatedEntries.Count) outdated package(s)."
+
+    $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $packageIndex = 0
+    foreach ($parts in $outdatedEntries) {
+        $packageIndex++
+
         $packageId = $parts[0]
         $installedVersionText = $parts[1]
         $availableVersionText = $parts[2]
+        Write-StageStatus "Chocolatey ($packageIndex/$($outdatedEntries.Count)): resolving release dates for $packageId..."
         $versionTexts = Get-ChocolateyAvailableVersions -PackageId $packageId -AvailableVersion $availableVersionText -MaxUpgradeVersions $MaxUpgradeVersions
         $installedVersion = Resolve-ChocolateyReleaseDate -PackageId $packageId -Version $installedVersionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
         $targets = [System.Collections.Generic.List[UpgradeTarget]]::new()
@@ -677,6 +700,7 @@ function Get-ScoopUpgradeablePackages {
     }
 
     try {
+        Write-StageStatus 'Scoop: querying package status...'
         $statusLines = @(scoop status 2>$null)
         if ($LASTEXITCODE -ne 0) {
             throw "scoop status exited with code $LASTEXITCODE."
@@ -686,7 +710,7 @@ function Get-ScoopUpgradeablePackages {
         return @()
     }
 
-    $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $outdatedEntries = [System.Collections.Generic.List[pscustomobject]]::new()
     foreach ($line in $statusLines) {
         if ($null -ne $line.PSObject.Properties['Name'] -and
             $null -ne $line.PSObject.Properties['Installed Version'] -and
@@ -705,6 +729,26 @@ function Get-ScoopUpgradeablePackages {
             $installedVersionText = $Matches.installedVersion
             $availableVersionText = $Matches.availableVersion
         }
+
+        $outdatedEntries.Add([pscustomobject]@{
+            PackageId = $packageId
+            InstalledVersionText = $installedVersionText
+            AvailableVersionText = $availableVersionText
+        })
+    }
+
+    Write-StageStatus "Scoop: found $($outdatedEntries.Count) candidate package(s) to check."
+
+    $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $packageIndex = 0
+    foreach ($entry in $outdatedEntries) {
+        $packageIndex++
+
+        $packageId = $entry.PackageId
+        $installedVersionText = $entry.InstalledVersionText
+        $availableVersionText = $entry.AvailableVersionText
+        Write-StageStatus "Scoop ($packageIndex/$($outdatedEntries.Count)): resolving release dates for $packageId..."
+
         $candidateSource = ''
         try {
             $infoLines = @(scoop info $packageId 2>$null)
@@ -797,25 +841,31 @@ function Write-OutdatedPackageReport {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+    Write-StageStatus 'Loading release date cache...'
     $cache = Get-ReleaseDateCache -Path $CachePath -Clear:$ClearCache
     $packages = [System.Collections.Generic.List[SoftwarePackage]]::new()
     if ($PackageManager -contains 'WinGet') {
+        Write-StageStatus 'Checking WinGet packages...'
         foreach ($package in @(Get-WinGetUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
             $packages.Add($package)
         }
     }
     if ($PackageManager -contains 'Chocolatey') {
+        Write-StageStatus 'Checking Chocolatey packages...'
         foreach ($package in @(Get-ChocolateyUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
             $packages.Add($package)
         }
     }
     if ($PackageManager -contains 'Scoop') {
+        Write-StageStatus 'Checking Scoop packages...'
         foreach ($package in @(Get-ScoopUpgradeablePackages -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
             $packages.Add($package)
         }
     }
 
+    Write-StageStatus 'Saving release date cache...'
     Save-ReleaseDateCache -Cache $cache -Path $CachePath
+    Write-StageStatus 'Rendering report...'
     Write-OutdatedPackageReport -Packages $packages.ToArray() -CooldownHours $CooldownHours
     $global:LASTEXITCODE = 0
 }

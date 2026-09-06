@@ -2,6 +2,7 @@
 
 Export-ModuleMember -Function @(
     'Get-RelativeReleaseDateDisplay',
+    'Write-StageStatus',
     'Get-ReleaseDateCache',
     'Save-ReleaseDateCache',
     'Get-ReleaseDateCacheKey',
