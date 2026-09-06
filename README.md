@@ -34,7 +34,7 @@ Install-Module Microsoft.WinGet.Client -Scope CurrentUser
 
 ## Installation
 
-Clone the repository and create a shortcut in the current user's Startup folder. The shortcut runs the report at sign-in and keeps the PowerShell window open for 60 seconds after the report finishes.
+Clone the repository and create a shortcut in the current user's Startup folder. The shortcut runs the report at sign-in and keeps the PowerShell window open until you press Enter after the report finishes.
 
 Run the following in Windows PowerShell 5.1. Replace the repository URL if your repository is hosted elsewhere.
 
@@ -51,7 +51,7 @@ $powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\pow
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $powershellPath
-$shortcut.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& ''{0}''; Start-Sleep -Seconds 60"' -f $scriptPath
+$shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "& ''{0}''; Read-Host ''Press Enter to close''"' -f $scriptPath
 $shortcut.WorkingDirectory = $repoPath
 $shortcut.Description = 'Report outdated packages'
 $shortcut.Save()
