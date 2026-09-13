@@ -36,9 +36,7 @@ function Write-OutdatedPackageReport {
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
         Write-Host "`n## $($package.DisplayName) ($($package.PackageId))"
         Write-Host "Candidate source: $($package.CandidateSource)"
-        Write-Host -NoNewline 'Installed: '
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
-        Write-Host 'Upgrade targets:'
 
         $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
