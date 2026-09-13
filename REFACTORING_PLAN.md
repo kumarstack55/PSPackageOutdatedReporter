@@ -172,15 +172,13 @@ Status: [x] 完了
 
 対象:
 
-- WinGetの表形式レポートでは、`Name` の末尾に付く ` (PackageId)` を表示しない。
-  - 対象はWinGetに限定する。
-  - 末尾の括弧部分を削除する処理は、既存のpackage ID表現を壊さないよう、末尾だけを対象にする。
+- 表形式レポートでは、全managerで`DisplayName`だけを`Name`として表示し、` (PackageId)`を追加しない。
+  - package IDは詳細表示の見出しとupgrade commandで確認できるため、表では重複させない。
 
 検証:
 
-- WinGetの表示名から末尾の ` (PackageId)` だけが除去される。
-- 他のパッケージマネージャーの表示名は変わらない。
-- パッケージ名自体に括弧が含まれる場合、末尾のpackage ID以外は削除されない。
+- WinGet、Chocolatey、Scoopの`Name`が`DisplayName`だけになる。
+- package名自体に括弧が含まれる場合、その括弧は削除されない。
 
 ### Stage 2a-3: 日付列を分離し、表示を検証する
 

@@ -1,11 +1,7 @@
 ﻿function Get-ReportPackageName {
     param([Parameter(Mandatory)][SoftwarePackage]$Package)
 
-    if ($Package.PackageManagerId -eq 'winget') {
-        return $Package.DisplayName
-    }
-
-    return "$($Package.DisplayName) ($($Package.PackageId))"
+    return $Package.DisplayName
 }
 
 function Write-OutdatedPackageReport {
