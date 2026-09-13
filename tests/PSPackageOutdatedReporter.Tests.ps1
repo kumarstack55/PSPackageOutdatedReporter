@@ -25,6 +25,30 @@ Describe 'PSPackageOutdatedReporter' {
             Should -Be "scoop update 'O''Reilly.App'"
     }
 
+    It 'omits the package ID from WinGet report names only' {
+        InModuleScope PSPackageOutdatedReporter {
+            $version = [PackageVersion]::new('1.0.0', $null, 'NotPublished', 'None')
+            $target = [UpgradeTarget]::new($version, 'winget upgrade')
+            $wingetPackage = [SoftwarePackage]::new('winget', 'Contoso.App', 'Contoso App', 'winget', $null, $version, $version, @($target))
+            $scoopPackage = [SoftwarePackage]::new('scoop', 'demo', 'Demo', 'main', $null, $version, $version, @($target))
+
+            Get-ReportPackageName -Package $wingetPackage | Should -Be 'Contoso App'
+            Get-ReportPackageName -Package $scoopPackage | Should -Be 'Demo (demo)'
+        }
+    }
+
+    It 'separates release date and relative displays' {
+        InModuleScope PSPackageOutdatedReporter {
+            $releasedVersion = [PackageVersion]::new('1.0.0', [datetime]'2026-01-02', 'Found', 'test')
+            $unreleasedVersion = [PackageVersion]::new('1.0.0', $null, 'NotPublished', 'test')
+
+            $releasedVersion.GetReleaseDateOnlyDisplay() | Should -Be '2026-01-02'
+            $releasedVersion.GetReleaseDateRelativeDisplay() | Should -Match 'ago$|^in '
+            $unreleasedVersion.GetReleaseDateOnlyDisplay() | Should -Be 'Unknown'
+            $unreleasedVersion.GetReleaseDateRelativeDisplay() | Should -Be 'Unknown (NotPublished)'
+        }
+    }
+
     It 'marks Scoop release dates as unpublished and caches the result' {
         $cache = @{ schemaVersion = 1; entries = @{} }
 
