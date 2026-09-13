@@ -40,10 +40,11 @@ function Write-OutdatedPackageReport {
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
         Write-Host 'Upgrade targets:'
 
+        $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
-            Write-Host -NoNewline '  '
-            Write-Host -NoNewline -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
-            Write-Host -NoNewline ' --> '
+            $targetIndex++
+            $targetPrefix = if ($targetIndex -lt $package.UpgradeTargets.Count) { '+-->' } else { '`-->' }
+            Write-Host -NoNewline "  $targetPrefix "
 
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
             $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
