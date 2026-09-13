@@ -4,6 +4,16 @@
     return $Package.DisplayName
 }
 
+function Get-ReportPackageHeading {
+    param([Parameter(Mandatory)][SoftwarePackage]$Package)
+
+    if ($Package.DisplayName -ceq $Package.PackageId) {
+        return $Package.DisplayName
+    }
+
+    return "$($Package.DisplayName) ($($Package.PackageId))"
+}
+
 function Write-OutdatedPackageReport {
     [CmdletBinding()]
     param(
@@ -34,7 +44,7 @@ function Write-OutdatedPackageReport {
         Out-Host
 
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
-        Write-Host "`n## $($package.DisplayName) ($($package.PackageId))"
+            Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
         Write-Host "Candidate source: $($package.CandidateSource)"
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
 
