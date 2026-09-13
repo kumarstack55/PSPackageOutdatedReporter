@@ -25,7 +25,7 @@ Describe 'PSPackageOutdatedReporter' {
             Should -Be "scoop update 'O''Reilly.App'"
     }
 
-    It 'omits the package ID from WinGet report names only' {
+    It 'uses display names without package IDs in report names' {
         InModuleScope PSPackageOutdatedReporter {
             $version = [PackageVersion]::new('1.0.0', $null, 'NotPublished', 'None')
             $target = [UpgradeTarget]::new($version, 'winget upgrade')
@@ -33,7 +33,7 @@ Describe 'PSPackageOutdatedReporter' {
             $scoopPackage = [SoftwarePackage]::new('scoop', 'demo', 'Demo', 'main', $null, $version, $version, @($target))
 
             Get-ReportPackageName -Package $wingetPackage | Should -Be 'Contoso App'
-            Get-ReportPackageName -Package $scoopPackage | Should -Be 'Demo (demo)'
+            Get-ReportPackageName -Package $scoopPackage | Should -Be 'Demo'
         }
     }
 
