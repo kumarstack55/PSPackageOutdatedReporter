@@ -31,9 +31,12 @@ Describe 'PSPackageOutdatedReporter' {
             $target = [UpgradeTarget]::new($version, 'winget upgrade')
             $wingetPackage = [SoftwarePackage]::new('winget', 'Contoso.App', 'Contoso App', 'winget', $null, $version, $version, @($target))
             $scoopPackage = [SoftwarePackage]::new('scoop', 'demo', 'Demo', 'main', $null, $version, $version, @($target))
+            $chocolateyPackage = [SoftwarePackage]::new('chocolatey', 'nodejs.install', 'nodejs.install', 'chocolatey', $null, $version, $version, @($target))
 
             Get-ReportPackageName -Package $wingetPackage | Should -Be 'Contoso App'
             Get-ReportPackageName -Package $scoopPackage | Should -Be 'Demo'
+            Get-ReportPackageHeading -Package $scoopPackage | Should -Be 'Demo (demo)'
+            Get-ReportPackageHeading -Package $chocolateyPackage | Should -Be 'nodejs.install'
         }
     }
 
