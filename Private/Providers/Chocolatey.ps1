@@ -8,58 +8,43 @@
         [Parameter(Mandatory)][int]$CacheTtlHours
     )
 
-    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'chocolatey' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
-    $entry = $Cache.entries[$cacheKey]
-    if ($null -ne $entry) {
-        $cachedAt = [datetime]::MinValue
-        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
-            return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
-        }
-    }
+    return Resolve-CachedPackageVersion -PackageManagerId 'chocolatey' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version -Cache $Cache -CacheTtlHours $CacheTtlHours -ResolveReleaseDate {
+        $metadataSource = 'chocolatey.org'
+        $status = 'Found'
+        $releasedAt = $null
 
-    $metadataSource = 'chocolatey.org'
-    $status = 'Found'
-    $releasedAt = $null
+        if ($CandidateSource -ine 'chocolatey') {
+            $metadataSource = 'None'
+            $status = 'UnsupportedSource'
+        } else {
+            try {
+                $escapedId = $PackageId.Replace("'", "''")
+                $escapedVersion = $Version.Replace("'", "''")
+                $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
+                $response = & {
+                    $ProgressPreference = 'SilentlyContinue'
+                    Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+                }
+                $xml = [xml]$response.Content
+                $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
+                $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
+                $namespace.AddNamespace('d', 'http://schemas.microsoft.com/ado/2007/08/dataservices')
+                $publishedNode = $xml.SelectSingleNode('//m:properties/d:Published', $namespace)
 
-    if ($CandidateSource -ine 'chocolatey') {
-        $metadataSource = 'None'
-        $status = 'UnsupportedSource'
-    } else {
-        try {
-            $escapedId = $PackageId.Replace("'", "''")
-            $escapedVersion = $Version.Replace("'", "''")
-            $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
-            $response = & {
-                $ProgressPreference = 'SilentlyContinue'
-                Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+                $parsedDate = [datetime]::MinValue
+                if ($null -eq $publishedNode -or -not [datetime]::TryParse($publishedNode.InnerText, [ref]$parsedDate)) {
+                    $status = 'NotPublished'
+                } else {
+                    $releasedAt = $parsedDate.ToUniversalTime()
+                }
+            } catch {
+                $status = 'LookupFailed'
+                Write-Verbose "Failed to retrieve Chocolatey release date for $PackageId ${Version}: $($_.Exception.Message)"
             }
-            $xml = [xml]$response.Content
-            $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
-            $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
-            $namespace.AddNamespace('d', 'http://schemas.microsoft.com/ado/2007/08/dataservices')
-            $publishedNode = $xml.SelectSingleNode('//m:properties/d:Published', $namespace)
-
-            $parsedDate = [datetime]::MinValue
-            if ($null -eq $publishedNode -or -not [datetime]::TryParse($publishedNode.InnerText, [ref]$parsedDate)) {
-                $status = 'NotPublished'
-            } else {
-                $releasedAt = $parsedDate.ToUniversalTime()
-            }
-        } catch {
-            $status = 'LookupFailed'
-            Write-Verbose "Failed to retrieve Chocolatey release date for $PackageId ${Version}: $($_.Exception.Message)"
         }
-    }
 
-    $Cache.entries[$cacheKey] = @{
-        version = $Version
-        releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
-        status = $status
-        metadataSource = $metadataSource
-        cachedAt = [datetime]::UtcNow.ToString('o')
+        [ReleaseDateResolution]::new($releasedAt, $status, $metadataSource)
     }
-
-    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
 }
 
 function New-ChocolateyUpgradeCommand {

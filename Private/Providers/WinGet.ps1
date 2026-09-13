@@ -20,55 +20,40 @@ function Resolve-WinGetReleaseDate {
         [Parameter(Mandatory)][int]$CacheTtlHours
     )
 
-    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'winget' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
-    $entry = $Cache.entries[$cacheKey]
-    if ($null -ne $entry) {
-        $cachedAt = [datetime]::MinValue
-        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
-            return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
-        }
-    }
+    return Resolve-CachedPackageVersion -PackageManagerId 'winget' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version -Cache $Cache -CacheTtlHours $CacheTtlHours -ResolveReleaseDate {
+        $metadataSource = 'winget-pkgs'
+        $status = 'Found'
+        $releasedAt = $null
 
-    $metadataSource = 'winget-pkgs'
-    $status = 'Found'
-    $releasedAt = $null
-
-    if ($CandidateSource -ine 'winget') {
-        $metadataSource = 'None'
-        $status = 'UnsupportedSource'
-    } else {
-        try {
-            $manifest = & {
-                $ProgressPreference = 'SilentlyContinue'
-                Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
-            }
-
-            $releaseDateMatch = [regex]::Match($manifest.Content, '(?m)^ReleaseDate:\s*["'']?(?<value>\d{4}-\d{2}-\d{2})')
-            if ($releaseDateMatch.Success) {
-                $parsedDate = [datetime]::MinValue
-                if ([datetime]::TryParseExact($releaseDateMatch.Groups['value'].Value, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsedDate)) {
-                    $releasedAt = $parsedDate
-                } else {
-                    $status = 'InvalidReleaseDate'
+        if ($CandidateSource -ine 'winget') {
+            $metadataSource = 'None'
+            $status = 'UnsupportedSource'
+        } else {
+            try {
+                $manifest = & {
+                    $ProgressPreference = 'SilentlyContinue'
+                    Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
                 }
-            } else {
-                $status = 'NotPublished'
+
+                $releaseDateMatch = [regex]::Match($manifest.Content, '(?m)^ReleaseDate:\s*["'']?(?<value>\d{4}-\d{2}-\d{2})')
+                if ($releaseDateMatch.Success) {
+                    $parsedDate = [datetime]::MinValue
+                    if ([datetime]::TryParseExact($releaseDateMatch.Groups['value'].Value, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsedDate)) {
+                        $releasedAt = $parsedDate
+                    } else {
+                        $status = 'InvalidReleaseDate'
+                    }
+                } else {
+                    $status = 'NotPublished'
+                }
+            } catch {
+                $status = 'LookupFailed'
+                Write-Verbose "Failed to retrieve release date for $PackageId ${Version}: $($_.Exception.Message)"
             }
-        } catch {
-            $status = 'LookupFailed'
-            Write-Verbose "Failed to retrieve release date for $PackageId ${Version}: $($_.Exception.Message)"
         }
-    }
 
-    $Cache.entries[$cacheKey] = @{
-        version = $Version
-        releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
-        status = $status
-        metadataSource = $metadataSource
-        cachedAt = [datetime]::UtcNow.ToString('o')
+        [ReleaseDateResolution]::new($releasedAt, $status, $metadataSource)
     }
-
-    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
 }
 
 function New-WinGetUpgradeCommand {

@@ -52,45 +52,30 @@ function Resolve-ScoopReleaseDate {
         [Parameter(Mandatory)][int]$CacheTtlHours
     )
 
-    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'scoop' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
-    $entry = $Cache.entries[$cacheKey]
-    if ($null -ne $entry) {
-        $cachedAt = [datetime]::MinValue
-        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
-            return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
-        }
-    }
+    return Resolve-CachedPackageVersion -PackageManagerId 'scoop' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version -Cache $Cache -CacheTtlHours $CacheTtlHours -ResolveReleaseDate {
+        $metadataSource = 'Scoop manifest (git history)'
+        $status = 'NotPublished'
+        $releasedAt = $null
 
-    $metadataSource = 'Scoop manifest (git history)'
-    $status = 'NotPublished'
-    $releasedAt = $null
-
-    if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
-        $metadataSource = 'None'
-        $status = 'UnsupportedSource'
-    } else {
-        try {
-            $releasedAt = Get-ScoopManifestReleaseDate -PackageId $PackageId -Version $Version -BucketName $CandidateSource
-            if ($null -eq $releasedAt) {
-                $status = 'NotPublished'
-            } else {
-                $status = 'Found'
+        if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) {
+            $metadataSource = 'None'
+            $status = 'UnsupportedSource'
+        } else {
+            try {
+                $releasedAt = Get-ScoopManifestReleaseDate -PackageId $PackageId -Version $Version -BucketName $CandidateSource
+                if ($null -eq $releasedAt) {
+                    $status = 'NotPublished'
+                } else {
+                    $status = 'Found'
+                }
+            } catch {
+                $status = 'LookupFailed'
+                Write-Verbose "Failed to retrieve Scoop release date for $PackageId ${Version}: $($_.Exception.Message)"
             }
-        } catch {
-            $status = 'LookupFailed'
-            Write-Verbose "Failed to retrieve Scoop release date for $PackageId ${Version}: $($_.Exception.Message)"
         }
-    }
 
-    $Cache.entries[$cacheKey] = @{
-        version = $Version
-        releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
-        status = $status
-        metadataSource = $metadataSource
-        cachedAt = [datetime]::UtcNow.ToString('o')
+        [ReleaseDateResolution]::new($releasedAt, $status, $metadataSource)
     }
-
-    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
 }
 
 function New-ScoopUpgradeCommand {

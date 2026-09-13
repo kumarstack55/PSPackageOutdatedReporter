@@ -246,7 +246,7 @@ Status: [x] 完了
 
 ## Stage 5: キャッシュ付きrelease date解決を共通化する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 各プロバイダーに残った以下の重複を共通関数へ集約する。
 
