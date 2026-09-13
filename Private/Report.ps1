@@ -31,14 +31,13 @@ function Write-OutdatedPackageReport {
         Sort-Object DisplayName, CandidateSource |
         Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
             @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
-            @{ Name = 'Source'; Expression = { $_.CandidateSource } },
             @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
             @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetReleaseDateOnlyDisplay() } },
             @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetReleaseDateRelativeDisplay() } },
             @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
             @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetReleaseDateOnlyDisplay() } },
             @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetReleaseDateRelativeDisplay() } } |
-        Select-Object -Property Manager, Name, Source, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
+        Select-Object -Property Manager, Name, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
         Format-Table -AutoSize |
         Out-String -Width 4096 |
         Out-Host
