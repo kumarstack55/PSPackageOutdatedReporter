@@ -133,4 +133,4 @@ The default persistent cache is:
 %LOCALAPPDATA%\PSPackageOutdatedReporter\release-date-cache.json
 ```
 
-It is a single JSON file with a versioned schema and entries keyed by `manager|candidateSource|packageId|version`. Positive and negative release-date results are cached. Writes use a temporary file followed by replacement to avoid partial JSON files.
+It is a single JSON file with a versioned schema and entries keyed by `manager|candidateSource|packageId|version`. Positive and negative release-date results are cached. Each entry also records `firstObservedAt`, the first time this tool observed that package version. This value is retained when an expired entry is refreshed. Writes use a temporary file followed by replacement to avoid partial JSON files.

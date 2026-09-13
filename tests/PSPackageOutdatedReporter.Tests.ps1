@@ -59,11 +59,13 @@ Describe 'PSPackageOutdatedReporter' {
 
         $result.ReleaseDateStatus | Should -Be 'NotPublished'
         $cache.entries.Count | Should -Be 1
+        $cache.entries.Values[0].firstObservedAt | Should -Not -BeNullOrEmpty
+        $result.FirstObservedAt | Should -Not -BeNullOrEmpty
     }
 
     It 'round-trips the release date cache' {
         $cachePath = Join-Path $TestDrive 'release-date-cache.json'
-        $cache = @{ schemaVersion = 1; entries = @{ 'key' = @{ version = '1.2.3'; releasedAt = '2026-01-02'; status = 'Found'; metadataSource = 'test'; cachedAt = '2026-01-02T00:00:00Z' } } }
+        $cache = @{ schemaVersion = 1; entries = @{ 'key' = @{ version = '1.2.3'; releasedAt = '2026-01-02'; firstObservedAt = '2026-01-03T00:00:00Z'; status = 'Found'; metadataSource = 'test'; cachedAt = '2026-01-02T00:00:00Z' } } }
 
         Save-ReleaseDateCache -Cache $cache -Path $cachePath
         $loaded = Get-ReleaseDateCache -Path $cachePath
@@ -71,6 +73,21 @@ Describe 'PSPackageOutdatedReporter' {
         $loaded.schemaVersion | Should -Be 1
         $loaded.entries['key'].version | Should -Be '1.2.3'
         $loaded.entries['key'].status | Should -Be 'Found'
+        $loaded.entries['key'].firstObservedAt | Should -Be '2026-01-03T00:00:00Z'
+    }
+
+    It 'preserves FirstObservedAt when refreshing an expired entry' {
+        InModuleScope PSPackageOutdatedReporter {
+            $firstObservedAt = '2026-01-03T00:00:00Z'
+            $cache = @{ schemaVersion = 1; entries = @{ 'winget|winget|demo|1.2.3' = @{ version = '1.2.3'; releasedAt = $null; firstObservedAt = $firstObservedAt; status = 'NotPublished'; metadataSource = 'test'; cachedAt = '2026-01-01T00:00:00Z' } } }
+
+            $result = Resolve-CachedPackageVersion -PackageManagerId 'winget' -CandidateSource 'winget' -PackageId 'demo' -Version '1.2.3' -Cache $cache -CacheTtlHours 1 -ResolveReleaseDate {
+                [ReleaseDateResolution]::new($null, 'NotPublished', 'test')
+            }
+
+            ([datetime]$cache.entries['winget|winget|demo|1.2.3'].firstObservedAt).ToUniversalTime() | Should -Be ([datetime]$firstObservedAt).ToUniversalTime()
+            $result.FirstObservedAt.ToUniversalTime() | Should -Be ([datetime]$firstObservedAt).ToUniversalTime()
+        }
     }
 
     It 'returns UnsupportedSource without making an HTTP request' {

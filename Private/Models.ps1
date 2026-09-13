@@ -13,6 +13,7 @@
 class PackageVersion {
     [string]$Version
     [object]$ReleasedAt
+    [object]$FirstObservedAt
     [string]$ReleaseDateStatus
     [string]$MetadataSource
 
