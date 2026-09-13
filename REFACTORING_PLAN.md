@@ -70,6 +70,36 @@ Status: [ ] 未着手
 - 非対応sourceでHTTPリクエストを実行しないこと
 - WinGet CLI/moduleエラー時に空の結果を返すこと
 
+## Stage 2a: レポート表示を整理する
+
+Status: [ ] 未着手
+
+実装時期は、Stage 1で `Write-OutdatedPackageReport` を分離した後にするか、表示上の問題を先に解消するかを検討する。表示処理の責務が明確になるため、現時点ではStage 1の直後に実施する案を推奨する。
+
+対象:
+
+- WinGetの表形式レポートでは、`Name` の末尾に付く ` (PackageId)` を表示しない。
+  - 対象はWinGetに限定する。
+  - 末尾の括弧部分を削除する処理は、既存のpackage ID表現を壊さないよう、末尾だけを対象にする。
+- `InstalledDate` を、インストールされたバージョンのリリース日だと明確にわかる列名へ変更する。
+- `LatestDate` を、最新バージョンのリリース日だと明確にわかる列名へ変更する。
+- 絶対日付と相対表示（`... ago`、`in ...`、`Unknown (...)`）を別列にする。
+
+列名の候補:
+
+- 推奨: `InstalledVersionReleaseDate`、`InstalledVersionReleaseAge`、`LatestVersionReleaseDate`、`LatestVersionReleaseAge`
+- 代替案: `InstalledVersionReleasedAt`、`InstalledVersionReleaseRelative`、`LatestVersionReleasedAt`、`LatestVersionReleaseRelative`
+
+`ReleasedAt` は日時値を想起させる一方、現在の表は日付と相対表示を扱うため、表の列名には `ReleaseDate` を使う案を第一候補とする。相対表示側は `Age` が簡潔だが、将来 `in ...` や状態文字列も含むため、必要なら `ReleaseDateRelative` に変更する。
+
+検証:
+
+- WinGetの表示名から末尾の ` (PackageId)` だけが除去され、他のパッケージマネージャーの表示は変わらないこと。
+- 表の列名からInstalled/Latestのどちらのバージョンに対応する日付か判別できること。
+- 絶対日付列と相対表示列が別々に出力されること。
+- 日付不明、過去、当日、未来の各状態で列の意味が崩れないこと。
+- 既存の詳細表示（アップグレード対象行）は、必要な情報を失わないこと。
+
 ## Stage 3: Chocolateyを分割する
 
 Status: [ ] 未着手
