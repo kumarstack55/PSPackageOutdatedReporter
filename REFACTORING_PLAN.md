@@ -32,7 +32,7 @@ Status: [ ] 未着手
 Status: [x] 完了
 
 - `PackageVersion`、`UpgradeTarget`、`SoftwarePackage` を `Private/Models.ps1` へ移動する。
-- メインスクリプトとモジュールimportの両方で、モデルを先に読み込む。
+- メインスクリプトとモジュールimportの両方で、モデルを共通処理より先に読み込む。
 - 既存の表示メソッドと型定義を維持する。
 
 検証:
@@ -65,6 +65,19 @@ Status: [x] 完了
 
 - Windows PowerShell 5.1で既存のPesterテストが通ること。
 - 引数のクォートとバージョン比較が従来どおり動作すること。
+
+### Stage 1-4: 表示処理を分割する
+
+Status: [x] 完了
+
+- 相対リリース日表示とステージ状態表示を `Private/Formatting.ps1` へ移動する。
+- `Formatting.ps1` を `Models.ps1` より先に読み込み、モデルの表示メソッドから相対日付関数を利用できるようにする。
+- 表示内容と公開関数名を維持する。
+
+検証:
+
+- Windows PowerShell 5.1で既存のPesterテストが通ること。
+- 過去、未来、当日の相対日付表示が従来どおり動作すること。
 
 追加するファイル:
 
