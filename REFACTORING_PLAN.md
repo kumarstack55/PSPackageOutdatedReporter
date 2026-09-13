@@ -201,7 +201,7 @@ Status: [x] 完了
 
 ## Stage 3: Chocolateyを分割する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 追加するファイル:
 
