@@ -53,6 +53,19 @@ Status: [x] 完了
 - Windows PowerShell 5.1で既存のPesterテストが通ること。
 - キャッシュの保存と読み込みが従来どおり動作すること。
 
+### Stage 1-3: バージョン処理を分割する
+
+Status: [x] 完了
+
+- PowerShell引数のエスケープ、バージョン正規化、バージョン比較を `Private/Version.ps1` へ移動する。
+- upgrade command生成やレポート名生成など、provider・表示に属する処理はこの段階では移動しない。
+- 既存の公開関数名とバージョン比較の挙動を維持する。
+
+検証:
+
+- Windows PowerShell 5.1で既存のPesterテストが通ること。
+- 引数のクォートとバージョン比較が従来どおり動作すること。
+
 追加するファイル:
 
 - `Private/Models.ps1`
