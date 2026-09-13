@@ -25,7 +25,7 @@ Status: [x] 完了
 
 ## Stage 1: 共通コードを分割する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 ### Stage 1-1: モデル定義を分割する
 
@@ -78,6 +78,19 @@ Status: [x] 完了
 
 - Windows PowerShell 5.1で既存のPesterテストが通ること。
 - 過去、未来、当日の相対日付表示が従来どおり動作すること。
+
+### Stage 1-5: レポート処理を分割する
+
+Status: [x] 完了
+
+- レポート名生成と `Write-OutdatedPackageReport` を `Private/Report.ps1` へ移動する。
+- `Report.ps1` はFormatting、Models、Versionに依存するため、それらの後に読み込む。
+- 表の列名、WinGetの表示名、詳細レポートの出力内容を維持する。
+
+検証:
+
+- Windows PowerShell 5.1で既存のPesterテストが通ること。
+- モジュールimport時にレポートが実行されないこと。
 
 追加するファイル:
 
@@ -281,3 +294,4 @@ Status: [ ] 未着手
 - PowerShell 5.1でのclass読み込み順をStage 1で実際に確認する。
 - 既存の関数をmoduleから引き続きexportするか、内部関数を非公開にするかをStage 6で判断する。
 - provider registryは、3プロバイダーの分割後も実行制御が複雑な場合にだけ導入する。
+
