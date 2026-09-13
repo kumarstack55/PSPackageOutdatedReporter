@@ -74,6 +74,22 @@ class PackageVersion {
         return "Unknown ($($this.ReleaseDateStatus))"
     }
 
+    [string] GetReleaseDateOnlyDisplay() {
+        if ($null -eq $this.ReleasedAt) {
+            return 'Unknown'
+        }
+
+        return ([datetime]$this.ReleasedAt).ToString('yyyy-MM-dd')
+    }
+
+    [string] GetReleaseDateRelativeDisplay() {
+        if ($null -eq $this.ReleasedAt) {
+            return "Unknown ($($this.ReleaseDateStatus))"
+        }
+
+        return Get-RelativeReleaseDateDisplay -ReleasedAt ([datetime]$this.ReleasedAt)
+    }
+
     [bool] IsInCooldown([int]$CooldownHours) {
         if ($CooldownHours -le 0 -or $null -eq $this.ReleasedAt) {
             return $false
@@ -406,6 +422,16 @@ function Test-IsOlderPackageVersion {
     }
 
     return $candidateNormalized -lt $baselineNormalized
+}
+
+function Get-ReportPackageName {
+    param([Parameter(Mandatory)][SoftwarePackage]$Package)
+
+    if ($Package.PackageManagerId -eq 'winget') {
+        return $Package.DisplayName
+    }
+
+    return "$($Package.DisplayName) ($($Package.PackageId))"
 }
 
 function New-WinGetUpgradeCommand {
@@ -803,13 +829,15 @@ function Write-OutdatedPackageReport {
     $Packages |
         Sort-Object DisplayName, CandidateSource |
         Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
-            @{ Name = 'Name'; Expression = { "$($_.DisplayName) ($($_.PackageId))" } },
+            @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
             @{ Name = 'Source'; Expression = { $_.CandidateSource } },
             @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
-            @{ Name = 'InstalledDate'; Expression = { $_.InstalledVersion.GetReleaseDateDisplay() } },
+            @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetReleaseDateOnlyDisplay() } },
+            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetReleaseDateRelativeDisplay() } },
             @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
-            @{ Name = 'LatestDate'; Expression = { $_.LatestVersion.GetReleaseDateDisplay() } } |
-        Select-Object -Property Manager, Name, Source, InstalledVersion, InstalledDate, LatestVersion, LatestDate |
+            @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetReleaseDateOnlyDisplay() } },
+            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetReleaseDateRelativeDisplay() } } |
+        Select-Object -Property Manager, Name, Source, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
         Format-Table -AutoSize |
         Out-String -Width 4096 |
         Out-Host

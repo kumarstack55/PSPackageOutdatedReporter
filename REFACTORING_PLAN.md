@@ -72,7 +72,7 @@ Status: [ ] 未着手
 
 ## Stage 2a: レポート表示を整理する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 Stage 1の完了を待たず、現在の `Write-OutdatedPackageReport` に対して先に実施する。表示仕様を先に固定してからStage 1の分割へ進むことで、構造変更と表示変更を同時に行わないようにする。
 
@@ -84,7 +84,7 @@ Stage 1の完了を待たず、現在の `Write-OutdatedPackageReport` に対し
 
 ### Stage 2a-1: 表の仕様と列名を確定する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 対象:
 
@@ -95,15 +95,15 @@ Status: [ ] 未着手
 列名の第一候補:
 
 - `InstalledVersionReleaseDate`
-- `InstalledVersionReleaseAge`
+- `InstalledVersionReleaseRelative`
 - `LatestVersionReleaseDate`
-- `LatestVersionReleaseAge`
+- `LatestVersionReleaseRelative`
 
 `ReleasedAt` は日時値を想起させる一方、現在の表は日付と相対表示を扱うため、表の列名には `ReleaseDate` を使う。相対表示側は過去だけでなく未来や不明状態も含むため、`Age` が意味に合わない場合は `ReleaseDateRelative` へ変更する。
 
 ### Stage 2a-2: WinGetの表示名を整理する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 対象:
 
@@ -119,7 +119,7 @@ Status: [ ] 未着手
 
 ### Stage 2a-3: 日付列を分離し、表示を検証する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 対象:
 
