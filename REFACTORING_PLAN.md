@@ -27,6 +27,19 @@ Status: [x] 完了
 
 Status: [ ] 未着手
 
+### Stage 1-1: モデル定義を分割する
+
+Status: [x] 完了
+
+- `PackageVersion`、`UpgradeTarget`、`SoftwarePackage` を `Private/Models.ps1` へ移動する。
+- メインスクリプトとモジュールimportの両方で、モデルを先に読み込む。
+- 既存の表示メソッドと型定義を維持する。
+
+検証:
+
+- Windows PowerShell 5.1で既存のPesterテストが通ること。
+- モジュールimport時にクラス型が解決されること。
+
 追加するファイル:
 
 - `Private/Models.ps1`
