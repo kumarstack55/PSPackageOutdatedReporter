@@ -223,7 +223,7 @@ Status: [x] 完了
 
 ## Stage 4: Scoopを分割する
 
-Status: [ ] 未着手
+Status: [x] 完了
 
 追加するファイル:
 
