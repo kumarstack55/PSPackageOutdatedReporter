@@ -92,3 +92,40 @@ function ConvertTo-PackageVersionFromCacheEntry {
 
     return [PackageVersion]::new([string]$Entry.version, $releasedAt, [string]$Entry.status, [string]$Entry.metadataSource)
 }
+
+function Resolve-CachedPackageVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageManagerId,
+        [Parameter(Mandatory)][string]$CandidateSource,
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][int]$CacheTtlHours,
+        [Parameter(Mandatory)][scriptblock]$ResolveReleaseDate
+    )
+
+    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId $PackageManagerId -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
+    $entry = $Cache.entries[$cacheKey]
+    if ($null -ne $entry) {
+        $cachedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
+            return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
+        }
+    }
+
+    $resolution = & $ResolveReleaseDate
+    $releasedAt = $resolution.ReleasedAt
+    $status = [string]$resolution.Status
+    $metadataSource = [string]$resolution.MetadataSource
+
+    $Cache.entries[$cacheKey] = @{
+        version = $Version
+        releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
+        status = $status
+        metadataSource = $metadataSource
+        cachedAt = [datetime]::UtcNow.ToString('o')
+    }
+
+    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
+}

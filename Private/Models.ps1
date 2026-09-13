@@ -1,4 +1,16 @@
-﻿class PackageVersion {
+﻿class ReleaseDateResolution {
+    [object]$ReleasedAt
+    [string]$Status
+    [string]$MetadataSource
+
+    ReleaseDateResolution([object]$ReleasedAt, [string]$Status, [string]$MetadataSource) {
+        $this.ReleasedAt = $ReleasedAt
+        $this.Status = $Status
+        $this.MetadataSource = $MetadataSource
+    }
+}
+
+class PackageVersion {
     [string]$Version
     [object]$ReleasedAt
     [string]$ReleaseDateStatus
