@@ -1,0 +1,5 @@
+# Keep only the rules required by this repository for now.
+default: false
+
+# Markdown files must end with exactly one newline character.
+MD047: true

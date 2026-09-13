@@ -35,7 +35,13 @@ Mark a breaking change with `!`, or explain it in the commit body using `BREAKIN
 
 ## Validation
 
-Run the tests from Windows PowerShell 5.1 before submitting changes:
+Run the Markdown lint before submitting documentation changes:
+
+```powershell
+npx --yes markdownlint-cli2@0.23.2 "**/*.md"
+```
+
+Run the tests from Windows PowerShell 5.1 before submitting code changes:
 
 ```powershell
 Invoke-Pester .\tests
