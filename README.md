@@ -96,6 +96,8 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Invo
 
 The user-facing interface remains `Invoke-ReportPackageOutdated.ps1`; the module is an internal testability boundary.
 
+For contribution and commit message guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Release dates
 
 WinGet does not provide version release dates through `Microsoft.WinGet.Client`. For packages resolved from the official `winget` source, the script retrieves the optional `ReleaseDate` field from the matching version manifest in `microsoft/winget-pkgs`.
