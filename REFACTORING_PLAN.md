@@ -40,6 +40,19 @@ Status: [x] 完了
 - Windows PowerShell 5.1で既存のPesterテストが通ること。
 - モジュールimport時にクラス型が解決されること。
 
+### Stage 1-2: キャッシュ処理を分割する
+
+Status: [x] 完了
+
+- リリース日キャッシュの読み書き、キー生成、キャッシュエントリ変換を `Private/Cache.ps1` へ移動する。
+- `Models.ps1` の後に読み込み、`PackageVersion` を変換処理から利用できるようにする。
+- 既存のcache schema、cache key、公開関数名を維持する。
+
+検証:
+
+- Windows PowerShell 5.1で既存のPesterテストが通ること。
+- キャッシュの保存と読み込みが従来どおり動作すること。
+
 追加するファイル:
 
 - `Private/Models.ps1`
