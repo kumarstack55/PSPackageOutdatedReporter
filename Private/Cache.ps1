@@ -26,6 +26,7 @@
             $cache.entries[$property.Name] = @{
                 version = [string]$entry.version
                 releasedAt = [string]$entry.releasedAt
+                firstObservedAt = [string]$entry.firstObservedAt
                 status = [string]$entry.status
                 metadataSource = [string]$entry.metadataSource
                 cachedAt = [string]$entry.cachedAt
@@ -90,7 +91,15 @@ function ConvertTo-PackageVersionFromCacheEntry {
         }
     }
 
-    return [PackageVersion]::new([string]$Entry.version, $releasedAt, [string]$Entry.status, [string]$Entry.metadataSource)
+    $packageVersion = [PackageVersion]::new([string]$Entry.version, $releasedAt, [string]$Entry.status, [string]$Entry.metadataSource)
+    if (-not [string]::IsNullOrWhiteSpace([string]$Entry.firstObservedAt)) {
+        $firstObservedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$Entry.firstObservedAt, [ref]$firstObservedAt)) {
+            $packageVersion.FirstObservedAt = $firstObservedAt
+        }
+    }
+
+    return $packageVersion
 }
 
 function Resolve-CachedPackageVersion {
@@ -118,14 +127,24 @@ function Resolve-CachedPackageVersion {
     $releasedAt = $resolution.ReleasedAt
     $status = [string]$resolution.Status
     $metadataSource = [string]$resolution.MetadataSource
+    $firstObservedAt = [datetime]::UtcNow
+    if ($null -ne $entry -and -not [string]::IsNullOrWhiteSpace([string]$entry.firstObservedAt)) {
+        $parsedFirstObservedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$entry.firstObservedAt, [ref]$parsedFirstObservedAt)) {
+            $firstObservedAt = $parsedFirstObservedAt
+        }
+    }
 
     $Cache.entries[$cacheKey] = @{
         version = $Version
         releasedAt = if ($null -ne $releasedAt) { ([datetime]$releasedAt).ToString('yyyy-MM-dd') } else { $null }
+        firstObservedAt = $firstObservedAt.ToUniversalTime().ToString('o')
         status = $status
         metadataSource = $metadataSource
         cachedAt = [datetime]::UtcNow.ToString('o')
     }
 
-    return [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
+    $packageVersion = [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
+    $packageVersion.FirstObservedAt = $firstObservedAt
+    return $packageVersion
 }
