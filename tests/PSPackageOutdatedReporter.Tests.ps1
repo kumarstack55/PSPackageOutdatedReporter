@@ -29,9 +29,9 @@ Describe 'PSPackageOutdatedReporter' {
         InModuleScope PSPackageOutdatedReporter {
             $version = [PackageVersion]::new('1.0.0', $null, 'NotPublished', 'None')
             $target = [UpgradeTarget]::new($version, 'winget upgrade')
-            $wingetPackage = [SoftwarePackage]::new('winget', 'Contoso.App', 'Contoso App', 'winget', $null, $version, $version, @($target))
-            $scoopPackage = [SoftwarePackage]::new('scoop', 'demo', 'Demo', 'main', $null, $version, $version, @($target))
-            $chocolateyPackage = [SoftwarePackage]::new('chocolatey', 'nodejs.install', 'nodejs.install', 'chocolatey', $null, $version, $version, @($target))
+            $wingetPackage = [SoftwarePackage]::new('winget', 'Contoso.App', 'Contoso App', 'winget', $null, $version, $version, @($target), 'https://example.com/contoso')
+            $scoopPackage = [SoftwarePackage]::new('scoop', 'demo', 'Demo', 'main', $null, $version, $version, @($target), 'https://example.com/demo')
+            $chocolateyPackage = [SoftwarePackage]::new('chocolatey', 'nodejs.install', 'nodejs.install', 'chocolatey', $null, $version, $version, @($target), 'https://example.com/nodejs')
 
             Get-ReportPackageName -Package $wingetPackage | Should -Be 'Contoso App'
             Get-ReportPackageName -Package $scoopPackage | Should -Be 'Demo'

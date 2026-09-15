@@ -168,6 +168,7 @@ class SoftwarePackage {
     [PackageVersion]$InstalledVersion
     [PackageVersion]$LatestVersion
     [UpgradeTarget[]]$UpgradeTargets
+    [string]$InfoUrl
 
     SoftwarePackage(
         [string]$PackageManagerId,
@@ -177,7 +178,8 @@ class SoftwarePackage {
         [string]$InstalledSource,
         [PackageVersion]$InstalledVersion,
         [PackageVersion]$LatestVersion,
-        [UpgradeTarget[]]$UpgradeTargets
+        [UpgradeTarget[]]$UpgradeTargets,
+        [string]$InfoUrl
     ) {
         $this.PackageManagerId = $PackageManagerId
         $this.PackageId = $PackageId
@@ -187,5 +189,6 @@ class SoftwarePackage {
         $this.InstalledVersion = $InstalledVersion
         $this.LatestVersion = $LatestVersion
         $this.UpgradeTargets = $UpgradeTargets
+        $this.InfoUrl = $InfoUrl
     }
 }

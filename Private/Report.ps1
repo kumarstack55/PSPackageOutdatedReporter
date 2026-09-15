@@ -56,6 +56,9 @@ function Write-OutdatedPackageReport {
 
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
             Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
+        if (-not [string]::IsNullOrWhiteSpace($package.InfoUrl)) {
+            Write-Host $package.InfoUrl
+        }
         Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
 
         $maxVersionLength = @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
