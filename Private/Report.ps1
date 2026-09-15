@@ -46,14 +46,14 @@ function Write-OutdatedPackageReport {
             Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
         Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
 
-        $maxVersionLength = @($package.InstalledVersion.Version.Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
+        $maxVersionLength = @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
-        $maxDateDisplayLength = @($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length }) |
+        $maxDateDisplayLength = @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
 
-        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version.PadRight($maxVersionLength)) [$($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay().PadRight($maxDateDisplayLength))]"
+        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay())]"
 
         $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
