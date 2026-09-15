@@ -26,7 +26,7 @@ function Write-OutdatedPackageReport {
         return
     }
 
-    Write-Host 'Upgradeable packages:'
+    Write-Host 'Upgradeable packages (sorted by software name):'
     $Packages |
         Sort-Object DisplayName, CandidateSource |
         Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
