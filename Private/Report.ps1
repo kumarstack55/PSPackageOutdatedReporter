@@ -33,10 +33,10 @@ function Write-OutdatedPackageReport {
             @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
             @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
             @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
-            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplay() } },
+            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } },
             @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
             @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
-            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplay() } } |
+            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } } |
         Select-Object -Property Manager, Name, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
         Format-Table -AutoSize |
         Out-String -Width 4096 |

@@ -49,14 +49,26 @@ class PackageVersionDate {
         return ''
     }
 
+    [string] GetRelativeDisplayWithFallbackLabel() {
+        if (-not $this.IsKnown()) {
+            return "Unknown ($($this.UnknownReason))"
+        }
+
+        $relative = $this.GetRelativeDisplay()
+        $label = $this.GetFallbackLabel()
+        if ($label) {
+            return "$relative, $label"
+        }
+
+        return $relative
+    }
+
     [string] GetCombinedDisplay() {
         if (-not $this.IsKnown()) {
             return "Unknown ($($this.UnknownReason))"
         }
 
-        $label = $this.GetFallbackLabel()
-        $suffix = if ($label) { ", $label" } else { '' }
-        return "$($this.GetDateOnlyDisplay()) ($($this.GetRelativeDisplay())$suffix)"
+        return "$($this.GetDateOnlyDisplay()) ($($this.GetRelativeDisplayWithFallbackLabel()))"
     }
 }
 
