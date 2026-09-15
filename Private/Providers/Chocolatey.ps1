@@ -66,12 +66,15 @@ function Get-ChocolateyAvailableVersions {
     )
 
     try {
-        $lines = @(choco search $PackageId --exact --all-versions --limit-output --order-by=version --descending --no-color 2>$null)
+        # --order-by=version is not a supported clause; sort by normalized version ourselves instead.
+        $lines = @(choco search $PackageId --exact --all-versions --limit-output --no-color 2>$null)
         $versions = @($lines |
                 Where-Object { $_ -match "^$([regex]::Escape($PackageId))\|" } |
                 ForEach-Object { ($_ -split '\|', 3)[1] } |
                 Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-                Select-Object -Unique -First $MaxUpgradeVersions)
+                Select-Object -Unique |
+                Sort-Object -Property @{ Expression = { Get-NormalizedPackageVersion -Version $_ } } -Descending |
+                Select-Object -First $MaxUpgradeVersions)
 
         if ($versions -notcontains $AvailableVersion) {
             $versions = @($AvailableVersion) + $versions
