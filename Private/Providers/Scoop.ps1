@@ -38,6 +38,7 @@ function Get-ScoopManifestReleaseDate {
     $repositoryPath = $manifest.RepositoryPath
     $jsonPath = $manifest.JsonPath
 
+    Add-InvocationLogEntry -Type ExternalCommand -Detail 'git log'
     $hashDateArray = @(git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath 2>$null)
     if ($LASTEXITCODE -ne 0 -or $hashDateArray.Count -eq 0) {
         return $null
@@ -45,6 +46,7 @@ function Get-ScoopManifestReleaseDate {
 
     foreach ($hashDate in $hashDateArray) {
         $commitHash, $ymdString = $hashDate -split "`t", 2
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'git show'
         $gitShowOutputJson = git -C $repositoryPath show "${commitHash}:${jsonPath}" 2>$null
         if (-not $gitShowOutputJson) {
             continue
@@ -77,6 +79,7 @@ function Get-ScoopManifestVersionHistory {
     $repositoryPath = $manifest.RepositoryPath
     $jsonPath = $manifest.JsonPath
 
+    Add-InvocationLogEntry -Type ExternalCommand -Detail 'git log'
     $hashDateArray = @(git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath 2>$null)
     if ($LASTEXITCODE -ne 0 -or $hashDateArray.Count -eq 0) {
         return @()
@@ -87,6 +90,7 @@ function Get-ScoopManifestVersionHistory {
 
     foreach ($hashDate in $hashDateArray) {
         $commitHash, $ymdString = $hashDate -split "`t", 2
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'git show'
         $gitShowOutputJson = git -C $repositoryPath show "${commitHash}:${jsonPath}" 2>$null
         if (-not $gitShowOutputJson) {
             continue
@@ -218,6 +222,7 @@ function Get-ScoopUpgradeablePackages {
 
     try {
         Write-StageStatus 'Scoop: querying package status...'
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'scoop status'
         $statusRecords = @(scoop status 2>$null)
         if ($LASTEXITCODE -ne 0) {
             throw "scoop status exited with code $LASTEXITCODE."
@@ -268,6 +273,7 @@ function Get-ScoopUpgradeablePackages {
 
         $candidateSource = ''
         try {
+            Add-InvocationLogEntry -Type ExternalCommand -Detail 'scoop info'
             $infoLines = @(scoop info $packageId 2>$null)
             $sourceInfo = $infoLines | Where-Object { $null -ne $_.PSObject.Properties['Source'] } | Select-Object -First 1
             if ($null -ne $sourceInfo) {
