@@ -175,7 +175,8 @@ function New-ScoopUpgradeCommand {
         [Parameter(Mandatory)][string]$Version
     )
 
-    return "scoop update $(ConvertTo-PowerShellSingleQuotedArgument "${PackageId}@${Version}")"
+    $quotedArgument = $(ConvertTo-PowerShellSingleQuotedArgument "${PackageId}@${Version}")
+    return "scoop install $quotedArgument; scoop reset $quotedArgument"
 }
 
 function Get-ScoopUpgradeablePackages {
