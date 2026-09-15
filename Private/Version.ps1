@@ -4,6 +4,12 @@
     return "'$($Value.Replace("'", "''"))'"
 }
 
+function Get-PackageInfoUrlFallback {
+    param([Parameter(Mandatory)][string]$PackageId)
+
+    return "https://www.google.com/search?q=$([uri]::EscapeDataString($PackageId))"
+}
+
 function Get-NormalizedPackageVersion {
     param([Parameter(Mandatory)][string]$Version)
 

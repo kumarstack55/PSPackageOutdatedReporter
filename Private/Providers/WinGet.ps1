@@ -10,6 +10,63 @@
     return "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/$firstCharacter/$packagePath/$escapedVersion/$PackageId.yaml"
 }
 
+function Get-WinGetLocaleManifestUrl {
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$Locale
+    )
+
+    $firstCharacter = $PackageId.Substring(0, 1).ToLowerInvariant()
+    $packagePath = ($PackageId -split '\.') -join '/'
+    $escapedVersion = [uri]::EscapeDataString($Version)
+    return "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/$firstCharacter/$packagePath/$escapedVersion/$PackageId.locale.$Locale.yaml"
+}
+
+function Resolve-WinGetInfoUrl {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$CandidateSource
+    )
+
+    if ($CandidateSource -ine 'winget') {
+        return Get-PackageInfoUrlFallback -PackageId $PackageId
+    }
+
+    try {
+        $locale = 'en-US'
+        $versionManifest = & {
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+        }
+        $defaultLocaleMatch = [regex]::Match($versionManifest.Content, '(?m)^DefaultLocale:\s*(?<value>\S+)')
+        if ($defaultLocaleMatch.Success) {
+            $locale = $defaultLocaleMatch.Groups['value'].Value
+        }
+
+        $localeManifest = & {
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri (Get-WinGetLocaleManifestUrl -PackageId $PackageId -Version $Version -Locale $locale) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+        }
+
+        $releaseNotesUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^ReleaseNotesUrl:\s*(?<value>\S+)')
+        if ($releaseNotesUrlMatch.Success) {
+            return $releaseNotesUrlMatch.Groups['value'].Value
+        }
+
+        $packageUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^PackageUrl:\s*(?<value>\S+)')
+        if ($packageUrlMatch.Success) {
+            return $packageUrlMatch.Groups['value'].Value
+        }
+    } catch {
+        Write-Verbose "Failed to retrieve WinGet info URL for $PackageId ${Version}: $($_.Exception.Message)"
+    }
+
+    return Get-PackageInfoUrlFallback -PackageId $PackageId
+}
+
 function Resolve-WinGetReleaseDate {
     [CmdletBinding()]
     param(
@@ -120,7 +177,8 @@ function Get-WinGetUpgradeablePackages {
         }
 
         $latestVersion = $targets[0].PackageVersion
-        $reportPackages.Add([SoftwarePackage]::new('winget', $installedPackage.Id, $installedPackage.Name, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray()))
+        $infoUrl = Resolve-WinGetInfoUrl -PackageId $installedPackage.Id -Version $latestVersion.Version -CandidateSource $candidateSource
+        $reportPackages.Add([SoftwarePackage]::new('winget', $installedPackage.Id, $installedPackage.Name, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
     return $reportPackages.ToArray()

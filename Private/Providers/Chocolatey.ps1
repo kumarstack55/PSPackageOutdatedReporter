@@ -57,6 +57,44 @@ function New-ChocolateyUpgradeCommand {
     return "${sudoPrefix}choco upgrade $(ConvertTo-PowerShellSingleQuotedArgument $PackageId) --version $(ConvertTo-PowerShellSingleQuotedArgument $Version) --yes"
 }
 
+function Resolve-ChocolateyInfoUrl {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [Parameter(Mandatory)][string]$CandidateSource
+    )
+
+    if ($CandidateSource -ine 'chocolatey') {
+        return Get-PackageInfoUrlFallback -PackageId $PackageId
+    }
+
+    try {
+        $escapedId = $PackageId.Replace("'", "''")
+        $escapedVersion = $Version.Replace("'", "''")
+        $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
+        $response = & {
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+        }
+        $xml = [xml]$response.Content
+        $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
+        $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
+        $namespace.AddNamespace('d', 'http://schemas.microsoft.com/ado/2007/08/dataservices')
+
+        foreach ($fieldName in 'ProjectSourceUrl', 'PackageSourceUrl', 'ProjectUrl') {
+            $node = $xml.SelectSingleNode("//m:properties/d:$fieldName", $namespace)
+            if ($null -ne $node -and -not [string]::IsNullOrWhiteSpace($node.InnerText)) {
+                return $node.InnerText
+            }
+        }
+    } catch {
+        Write-Verbose "Failed to retrieve Chocolatey info URL for $PackageId ${Version}: $($_.Exception.Message)"
+    }
+
+    return Get-PackageInfoUrlFallback -PackageId $PackageId
+}
+
 function Get-ChocolateyAvailableVersions {
     [CmdletBinding()]
     param(
@@ -148,7 +186,8 @@ function Get-ChocolateyUpgradeablePackages {
 
         $latestTarget = $targets | Where-Object { $_.PackageVersion.Version -eq $availableVersionText } | Select-Object -First 1
         $latestVersion = if ($null -ne $latestTarget) { $latestTarget.PackageVersion } else { $targets[0].PackageVersion }
-        $reportPackages.Add([SoftwarePackage]::new('chocolatey', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray()))
+        $infoUrl = Resolve-ChocolateyInfoUrl -PackageId $packageId -Version $latestVersion.Version -CandidateSource $candidateSource
+        $reportPackages.Add([SoftwarePackage]::new('chocolatey', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
     return $reportPackages.ToArray()

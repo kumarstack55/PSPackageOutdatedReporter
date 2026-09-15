@@ -169,6 +169,29 @@ function Resolve-ScoopReleaseDate {
     }
 }
 
+function Resolve-ScoopInfoUrl {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [string]$BucketName
+    )
+
+    try {
+        $manifest = Resolve-ScoopManifestRepository -PackageId $PackageId -BucketName $BucketName
+        if ($null -ne $manifest) {
+            $manifestPath = Join-Path $manifest.RepositoryPath $manifest.JsonPath
+            $data = Get-Content -LiteralPath $manifestPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if (-not [string]::IsNullOrWhiteSpace([string]$data.homepage)) {
+                return [string]$data.homepage
+            }
+        }
+    } catch {
+        Write-Verbose "Failed to retrieve Scoop info URL for ${PackageId}: $($_.Exception.Message)"
+    }
+
+    return Get-PackageInfoUrlFallback -PackageId $PackageId
+}
+
 function New-ScoopUpgradeCommand {
     param(
         [Parameter(Mandatory)][string]$PackageId,
@@ -282,7 +305,8 @@ function Get-ScoopUpgradeablePackages {
 
         $latestTarget = $targets | Where-Object { $_.PackageVersion.Version -eq $availableVersionText } | Select-Object -First 1
         $latestVersion = if ($null -ne $latestTarget) { $latestTarget.PackageVersion } else { $targets[0].PackageVersion }
-        $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray()))
+        $infoUrl = Resolve-ScoopInfoUrl -PackageId $packageId -BucketName $candidateSource
+        $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
     return $reportPackages.ToArray()
