@@ -84,6 +84,8 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\In
 
 The internal functions are exposed through `PSPackageOutdatedReporter.psm1`. Importing the module does not run a report, so the functions can be tested without invoking WinGet, Chocolatey, or the network.
 
+Core behavior is covered by `tests/Core.Tests.ps1`. Provider behavior is covered by `tests/Providers/WinGet.Tests.ps1`, `tests/Providers/Chocolatey.Tests.ps1`, and `tests/Providers/Scoop.Tests.ps1`.
+
 Install Pester 5 if needed, then run the tests from Windows PowerShell 5.1:
 
 ```powershell
