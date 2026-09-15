@@ -27,5 +27,6 @@ Export-ModuleMember -Function @(
     'Get-ChocolateyAvailableVersions',
     'Get-ChocolateyUpgradeablePackages',
     'Get-ScoopUpgradeablePackages',
-    'Write-OutdatedPackageReport'
+    'Write-OutdatedPackageReport',
+    'Add-InvocationLogEntry'
 )

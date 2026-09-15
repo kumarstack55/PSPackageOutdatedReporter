@@ -21,6 +21,7 @@
                 $escapedId = $PackageId.Replace("'", "''")
                 $escapedVersion = $Version.Replace("'", "''")
                 $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
+                Add-InvocationLogEntry -Type WebRequest -Detail 'community.chocolatey.org Packages OData'
                 $response = & {
                     $ProgressPreference = 'SilentlyContinue'
                     Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
@@ -73,6 +74,7 @@ function Resolve-ChocolateyInfoUrl {
         $escapedId = $PackageId.Replace("'", "''")
         $escapedVersion = $Version.Replace("'", "''")
         $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
+        Add-InvocationLogEntry -Type WebRequest -Detail 'community.chocolatey.org Packages OData'
         $response = & {
             $ProgressPreference = 'SilentlyContinue'
             Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
@@ -105,6 +107,7 @@ function Get-ChocolateyAvailableVersions {
 
     try {
         # --order-by=version is not a supported clause; sort by normalized version ourselves instead.
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'choco search'
         $lines = @(choco search $PackageId --exact --all-versions --limit-output --no-color 2>$null)
         $versions = @($lines |
                 Where-Object { $_ -match "^$([regex]::Escape($PackageId))\|" } |
@@ -146,6 +149,7 @@ function Get-ChocolateyUpgradeablePackages {
 
     try {
         Write-StageStatus 'Chocolatey: querying outdated packages...'
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'choco outdated'
         $lines = @(choco outdated --no-color --limit-output 2>$null)
         if ($LASTEXITCODE -ne 0) {
             throw "choco outdated exited with code $LASTEXITCODE."

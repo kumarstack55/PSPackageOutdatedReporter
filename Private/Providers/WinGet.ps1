@@ -37,6 +37,7 @@ function Resolve-WinGetInfoUrl {
 
     try {
         $locale = 'en-US'
+        Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs version manifest'
         $versionManifest = & {
             $ProgressPreference = 'SilentlyContinue'
             Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
@@ -46,6 +47,7 @@ function Resolve-WinGetInfoUrl {
             $locale = $defaultLocaleMatch.Groups['value'].Value
         }
 
+        Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs locale manifest'
         $localeManifest = & {
             $ProgressPreference = 'SilentlyContinue'
             Invoke-WebRequest -Uri (Get-WinGetLocaleManifestUrl -PackageId $PackageId -Version $Version -Locale $locale) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
@@ -87,6 +89,7 @@ function Resolve-WinGetReleaseDate {
             $status = 'UnsupportedSource'
         } else {
             try {
+                Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs version manifest'
                 $manifest = & {
                     $ProgressPreference = 'SilentlyContinue'
                     Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
@@ -142,6 +145,7 @@ function Get-WinGetUpgradeablePackages {
         Write-StageStatus 'WinGet: loading Microsoft.WinGet.Client module...'
         Import-Module $module.Path -ErrorAction Stop
         Write-StageStatus 'WinGet: querying installed packages...'
+        Add-InvocationLogEntry -Type ExternalCommand -Detail 'Get-WinGetPackage'
         $installedPackages = Get-WinGetPackage -ErrorAction Stop
     } catch {
         Write-Warning "Unable to query WinGet packages: $($_.Exception.Message)"

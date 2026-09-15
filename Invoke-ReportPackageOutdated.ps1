@@ -23,6 +23,7 @@ param(
 )
 
 . "$PSScriptRoot\Private\Formatting.ps1"
+. "$PSScriptRoot\Private\InvocationLog.ps1"
 . "$PSScriptRoot\Private\Models.ps1"
 . "$PSScriptRoot\Private\Cache.ps1"
 . "$PSScriptRoot\Private\Version.ps1"
