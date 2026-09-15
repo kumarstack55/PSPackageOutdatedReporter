@@ -74,4 +74,11 @@ function Write-OutdatedPackageReport {
             Write-Host ": $($target.Command)"
         }
     }
+
+    $usesFirstSeenFallback = @($Packages | ForEach-Object {
+        @($_.InstalledVersion, $_.LatestVersion) + @($_.UpgradeTargets | ForEach-Object { $_.PackageVersion })
+    } | ForEach-Object { $_.GetEffectiveDateInfo().IsFirstObservedFallback }) -contains $true
+    if ($usesFirstSeenFallback) {
+        Write-Host -ForegroundColor DarkGray "`nNote: a version marked 'first seen' has no known release date; the date shown is instead the date this tool first observed that version."
+    }
 }
