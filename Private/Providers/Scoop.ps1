@@ -317,3 +317,5 @@ function Get-ScoopUpgradeablePackages {
 
     return $reportPackages.ToArray()
 }
+
+Register-PackageProvider -Id 'Scoop' -DisplayName 'Scoop' -CollectorCommand 'Get-ScoopUpgradeablePackages'
