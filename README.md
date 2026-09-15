@@ -91,10 +91,13 @@ Install Pester 5 if needed, then run the tests from Windows PowerShell 5.1:
 ```powershell
 Install-Module Pester -Scope CurrentUser -MinimumVersion 5.0
 
-Invoke-Pester .\tests
+$configuration = New-PesterConfiguration -Hashtable (Import-PowerShellDataFile .\PesterConfiguration.psd1)
+Invoke-Pester -Configuration $configuration
 # or
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Invoke-Pester -Path .\tests"
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command '$configuration = New-PesterConfiguration -Hashtable (Import-PowerShellDataFile .\PesterConfiguration.psd1); Invoke-Pester -Configuration $configuration'
 ```
+
+The Pester configuration reports coverage for the entry script and all core and provider implementation files. It does not enforce a coverage threshold yet.
 
 The user-facing interface remains `Invoke-ReportPackageOutdated.ps1`; the module is an internal testability boundary.
 
