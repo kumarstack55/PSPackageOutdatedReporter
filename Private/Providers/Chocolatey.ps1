@@ -53,7 +53,8 @@ function New-ChocolateyUpgradeCommand {
         [Parameter(Mandatory)][string]$Version
     )
 
-    return "choco upgrade $(ConvertTo-PowerShellSingleQuotedArgument $PackageId) --version $(ConvertTo-PowerShellSingleQuotedArgument $Version) --yes"
+    $sudoPrefix = if ($null -ne (Get-Command sudo -ErrorAction SilentlyContinue)) { 'sudo ' } else { '' }
+    return "${sudoPrefix}choco upgrade $(ConvertTo-PowerShellSingleQuotedArgument $PackageId) --version $(ConvertTo-PowerShellSingleQuotedArgument $Version) --yes"
 }
 
 function Get-ChocolateyAvailableVersions {
