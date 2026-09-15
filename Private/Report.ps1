@@ -44,7 +44,7 @@ function Write-OutdatedPackageReport {
 
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
             Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
-        Write-Host "Candidate source: $($package.CandidateSource)"
+        Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
 
         $targetIndex = 0
