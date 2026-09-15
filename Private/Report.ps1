@@ -26,18 +26,30 @@ function Write-OutdatedPackageReport {
         return
     }
 
-    Write-Host 'Upgradeable packages (sorted by software name):'
+    $reportColumns = @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
+        @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
+        @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
+        @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
+        @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } },
+        @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
+        @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
+        @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } }
+    $reportColumnNames = 'Manager', 'Name', 'InstalledVersion', 'InstalledVersionReleaseDate', 'InstalledVersionReleaseRelative', 'LatestVersion', 'LatestVersionReleaseDate', 'LatestVersionReleaseRelative'
+
+    Write-Host '## Upgradeable packages (sorted by software name)'
     $Packages |
         Sort-Object DisplayName, CandidateSource |
-        Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
-            @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
-            @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
-            @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
-            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } },
-            @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
-            @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
-            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } } |
-        Select-Object -Property Manager, Name, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
+        Select-Object -Property $reportColumns |
+        Select-Object -Property $reportColumnNames |
+        Format-Table -AutoSize |
+        Out-String -Width 4096 |
+        Out-Host
+
+    Write-Host '## Upgradeable packages (sorted by installed version release date, oldest first)'
+    $Packages |
+        Sort-Object -Property @{ Expression = { $_.InstalledVersion.GetEffectiveDateInfo().Date } } |
+        Select-Object -Property $reportColumns |
+        Select-Object -Property $reportColumnNames |
         Format-Table -AutoSize |
         Out-String -Width 4096 |
         Out-Host
