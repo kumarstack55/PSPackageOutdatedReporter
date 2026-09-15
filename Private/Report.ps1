@@ -32,11 +32,11 @@ function Write-OutdatedPackageReport {
         Select-Object @{ Name = 'Manager'; Expression = { $_.PackageManagerId } },
             @{ Name = 'Name'; Expression = { Get-ReportPackageName -Package $_ } },
             @{ Name = 'InstalledVersion'; Expression = { $_.InstalledVersion.Version } },
-            @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetReleaseDateOnlyDisplay() } },
-            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetReleaseDateRelativeDisplay() } },
+            @{ Name = 'InstalledVersionReleaseDate'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
+            @{ Name = 'InstalledVersionReleaseRelative'; Expression = { $_.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplay() } },
             @{ Name = 'LatestVersion'; Expression = { $_.LatestVersion.Version } },
-            @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetReleaseDateOnlyDisplay() } },
-            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetReleaseDateRelativeDisplay() } } |
+            @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
+            @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplay() } } |
         Select-Object -Property Manager, Name, InstalledVersion, InstalledVersionReleaseDate, InstalledVersionReleaseRelative, LatestVersion, LatestVersionReleaseDate, LatestVersionReleaseRelative |
         Format-Table -AutoSize |
         Out-String -Width 4096 |
@@ -49,11 +49,11 @@ function Write-OutdatedPackageReport {
         $maxVersionLength = @($package.InstalledVersion.Version.Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
-        $maxDateDisplayLength = @($package.InstalledVersion.GetReleaseDateDisplay().Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetReleaseDateDisplay().Length }) |
+        $maxDateDisplayLength = @($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
 
-        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version.PadRight($maxVersionLength)) [$($package.InstalledVersion.GetReleaseDateDisplay().PadRight($maxDateDisplayLength))]"
+        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version.PadRight($maxVersionLength)) [$($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay().PadRight($maxDateDisplayLength))]"
 
         $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
@@ -64,7 +64,7 @@ function Write-OutdatedPackageReport {
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
             $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
             $targetColor = if ($isInCooldown -or $isDowngrade) { 'DarkGray' } else { 'Green' }
-            Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version.PadRight($maxVersionLength)) [$($target.PackageVersion.GetReleaseDateDisplay().PadRight($maxDateDisplayLength))]"
+            Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version.PadRight($maxVersionLength)) [$($target.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().PadRight($maxDateDisplayLength))]"
             if ($isDowngrade) {
                 Write-Host -NoNewline -ForegroundColor DarkGray ' ⚠️ older than installed version'
             }

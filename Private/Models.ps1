@@ -10,6 +10,56 @@
     }
 }
 
+class PackageVersionDate {
+    [object]$Date
+    [bool]$IsFirstObservedFallback
+    [string]$UnknownReason
+
+    PackageVersionDate([object]$Date, [bool]$IsFirstObservedFallback, [string]$UnknownReason) {
+        $this.Date = $Date
+        $this.IsFirstObservedFallback = $IsFirstObservedFallback
+        $this.UnknownReason = $UnknownReason
+    }
+
+    [bool] IsKnown() {
+        return $null -ne $this.Date
+    }
+
+    [string] GetDateOnlyDisplay() {
+        if (-not $this.IsKnown()) {
+            return 'Unknown'
+        }
+
+        return ([datetime]$this.Date).ToString('yyyy-MM-dd')
+    }
+
+    [string] GetRelativeDisplay() {
+        if (-not $this.IsKnown()) {
+            return "Unknown ($($this.UnknownReason))"
+        }
+
+        return Get-RelativeReleaseDateDisplay -ReleasedAt ([datetime]$this.Date)
+    }
+
+    [string] GetFallbackLabel() {
+        if ($this.IsFirstObservedFallback) {
+            return 'first seen'
+        }
+
+        return ''
+    }
+
+    [string] GetCombinedDisplay() {
+        if (-not $this.IsKnown()) {
+            return "Unknown ($($this.UnknownReason))"
+        }
+
+        $label = $this.GetFallbackLabel()
+        $suffix = if ($label) { ", $label" } else { '' }
+        return "$($this.GetDateOnlyDisplay()) ($($this.GetRelativeDisplay())$suffix)"
+    }
+}
+
 class PackageVersion {
     [string]$Version
     [object]$ReleasedAt
@@ -52,16 +102,26 @@ class PackageVersion {
         return Get-RelativeReleaseDateDisplay -ReleasedAt ([datetime]$this.ReleasedAt)
     }
 
+    # release date when known, otherwise falls back to the date this tool first observed the version
+    [PackageVersionDate] GetEffectiveDateInfo() {
+        if ($null -ne $this.ReleasedAt) {
+            return [PackageVersionDate]::new([datetime]$this.ReleasedAt, $false, $this.ReleaseDateStatus)
+        }
+
+        return [PackageVersionDate]::new($this.FirstObservedAt, ($null -ne $this.FirstObservedAt), $this.ReleaseDateStatus)
+    }
+
     [bool] IsInCooldown([int]$CooldownHours) {
-        if ($CooldownHours -le 0 -or $null -eq $this.ReleasedAt) {
+        $effectiveDate = $this.GetEffectiveDateInfo().Date
+        if ($CooldownHours -le 0 -or $null -eq $effectiveDate) {
             return $false
         }
 
-        return ([datetime]::Now - [datetime]$this.ReleasedAt).TotalHours -lt $CooldownHours
+        return ([datetime]::Now - [datetime]$effectiveDate).TotalHours -lt $CooldownHours
     }
 
     [string] GetCooldownRemainingDisplay([int]$CooldownHours) {
-        $remainingHours = $CooldownHours - ([datetime]::Now - [datetime]$this.ReleasedAt).TotalHours
+        $remainingHours = $CooldownHours - ([datetime]::Now - [datetime]$this.GetEffectiveDateInfo().Date).TotalHours
         if ($remainingHours -le 0) {
             return '0h'
         }
@@ -75,6 +135,7 @@ class PackageVersion {
         return "${remainingHoursPart}h"
     }
 }
+
 
 class UpgradeTarget {
     [PackageVersion]$PackageVersion
