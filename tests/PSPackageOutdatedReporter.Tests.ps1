@@ -17,12 +17,12 @@ Describe 'PSPackageOutdatedReporter' {
 
     It 'builds upgrade commands with escaped arguments' {
         New-ChocolateyUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
-            Should -Be "choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"
+            Should -Be "sudo choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"
     }
 
     It 'builds a Scoop upgrade command' {
         New-ScoopUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
-            Should -Be "scoop update 'O''Reilly.App'"
+            Should -Be "scoop install 'O''Reilly.App@1.2.3'; scoop reset 'O''Reilly.App@1.2.3'"
     }
 
     It 'uses display names without package IDs in report names' {
