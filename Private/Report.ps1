@@ -45,7 +45,15 @@ function Write-OutdatedPackageReport {
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
             Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
         Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
-        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetReleaseDateDisplay())]"
+
+        $maxVersionLength = @($package.InstalledVersion.Version.Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
+            Measure-Object -Maximum |
+            Select-Object -ExpandProperty Maximum
+        $maxDateDisplayLength = @($package.InstalledVersion.GetReleaseDateDisplay().Length) + @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetReleaseDateDisplay().Length }) |
+            Measure-Object -Maximum |
+            Select-Object -ExpandProperty Maximum
+
+        Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version.PadRight($maxVersionLength)) [$($package.InstalledVersion.GetReleaseDateDisplay().PadRight($maxDateDisplayLength))]"
 
         $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
@@ -56,7 +64,7 @@ function Write-OutdatedPackageReport {
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
             $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
             $targetColor = if ($isInCooldown -or $isDowngrade) { 'DarkGray' } else { 'Green' }
-            Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version) [$($target.PackageVersion.GetReleaseDateDisplay())]"
+            Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version.PadRight($maxVersionLength)) [$($target.PackageVersion.GetReleaseDateDisplay().PadRight($maxDateDisplayLength))]"
             if ($isDowngrade) {
                 Write-Host -NoNewline -ForegroundColor DarkGray ' ⚠️ older than installed version'
             }
