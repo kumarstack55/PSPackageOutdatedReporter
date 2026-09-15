@@ -99,6 +99,19 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command '$con
 
 The Pester configuration reports coverage for the entry script and all core and provider implementation files. It does not enforce a coverage threshold yet.
 
+### Coverage report
+
+The Pester run writes a JaCoCo coverage report to `coverage.xml`. To inspect it as an HTML report, install the .NET SDK and ReportGenerator, then run:
+
+```powershell
+dotnet tool install --global dotnet-reportgenerator-globaltool
+
+reportgenerator -reports:coverage.xml -targetdir:coverage-report -reporttypes:Html
+Start-Process .\coverage-report\index.html
+```
+
+`coverage.xml` and `coverage-report/` are generated files and are not tracked by Git.
+
 The user-facing interface remains `Invoke-ReportPackageOutdated.ps1`; the module is an internal testability boundary.
 
 For contribution and commit message guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
