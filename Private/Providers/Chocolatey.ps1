@@ -196,3 +196,5 @@ function Get-ChocolateyUpgradeablePackages {
 
     return $reportPackages.ToArray()
 }
+
+Register-PackageProvider -Id 'Chocolatey' -DisplayName 'Chocolatey' -CollectorCommand 'Get-ChocolateyUpgradeablePackages'

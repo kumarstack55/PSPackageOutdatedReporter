@@ -187,3 +187,5 @@ function Get-WinGetUpgradeablePackages {
 
     return $reportPackages.ToArray()
 }
+
+Register-PackageProvider -Id 'WinGet' -DisplayName 'WinGet' -CollectorCommand 'Get-WinGetUpgradeablePackages'

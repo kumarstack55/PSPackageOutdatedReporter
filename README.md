@@ -86,6 +86,8 @@ The internal functions are exposed through `PSPackageOutdatedReporter.psm1`. Imp
 
 Core behavior is covered by `tests/Core.Tests.ps1`. Provider behavior is covered by `tests/Providers/WinGet.Tests.ps1`, `tests/Providers/Chocolatey.Tests.ps1`, and `tests/Providers/Scoop.Tests.ps1`.
 
+Providers register their collector when the module loads. A new provider must implement a collector accepting `Cache`, `CacheTtlHours`, `MaxUpgradeVersions`, and `SourceFilter`, return `SoftwarePackage[]`, and register its ID, display name, and collector command with `Register-PackageProvider`.
+
 Install Pester 5 if needed, then run the tests from Windows PowerShell 5.1:
 
 ```powershell
