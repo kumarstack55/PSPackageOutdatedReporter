@@ -1,8 +1,7 @@
-﻿function Get-ScoopManifestReleaseDate {
+﻿function Resolve-ScoopManifestRepository {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$PackageId,
-        [Parameter(Mandatory)][string]$Version,
         [string]$BucketName
     )
 
@@ -17,8 +16,27 @@
         return $null
     }
 
-    $repositoryPath = Split-Path $manifestItem.DirectoryName -Parent
-    $jsonPath = "bucket/${PackageId}.json"
+    return [pscustomobject]@{
+        RepositoryPath = Split-Path $manifestItem.DirectoryName -Parent
+        JsonPath = "bucket/${PackageId}.json"
+    }
+}
+
+function Get-ScoopManifestReleaseDate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [Parameter(Mandatory)][string]$Version,
+        [string]$BucketName
+    )
+
+    $manifest = Resolve-ScoopManifestRepository -PackageId $PackageId -BucketName $BucketName
+    if ($null -eq $manifest) {
+        return $null
+    }
+
+    $repositoryPath = $manifest.RepositoryPath
+    $jsonPath = $manifest.JsonPath
 
     $hashDateArray = @(git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath 2>$null)
     if ($LASTEXITCODE -ne 0 -or $hashDateArray.Count -eq 0) {
@@ -40,6 +58,79 @@
     }
 
     return $null
+}
+
+function Get-ScoopManifestVersionHistory {
+    [CmdletBinding()]
+    [OutputType([object[]])]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [string]$BucketName,
+        [int]$Limit = 10
+    )
+
+    $manifest = Resolve-ScoopManifestRepository -PackageId $PackageId -BucketName $BucketName
+    if ($null -eq $manifest) {
+        return @()
+    }
+
+    $repositoryPath = $manifest.RepositoryPath
+    $jsonPath = $manifest.JsonPath
+
+    $hashDateArray = @(git -C $repositoryPath log --follow --format='%H%x09%cs' -- $jsonPath 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $hashDateArray.Count -eq 0) {
+        return @()
+    }
+
+    $seen = [System.Collections.Generic.HashSet[string]]::new()
+    $history = [System.Collections.Generic.List[pscustomobject]]::new()
+
+    foreach ($hashDate in $hashDateArray) {
+        $commitHash, $ymdString = $hashDate -split "`t", 2
+        $gitShowOutputJson = git -C $repositoryPath show "${commitHash}:${jsonPath}" 2>$null
+        if (-not $gitShowOutputJson) {
+            continue
+        }
+
+        $data = $gitShowOutputJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $version = if ($null -ne $data) { [string]$data.version } else { $null }
+        if (-not [string]::IsNullOrWhiteSpace($version) -and $seen.Add($version)) {
+            $history.Add([pscustomobject]@{
+                Version = $version
+                ReleasedAt = [datetime]::ParseExact($ymdString, 'yyyy-MM-dd', $null)
+            })
+
+            if ($history.Count -ge $Limit) {
+                break
+            }
+        }
+    }
+
+    return $history.ToArray()
+}
+
+function Get-ScoopAvailableVersions {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$PackageId,
+        [string]$BucketName,
+        [Parameter(Mandatory)][string]$AvailableVersion,
+        [Parameter(Mandatory)][int]$MaxUpgradeVersions
+    )
+
+    try {
+        $history = @(Get-ScoopManifestVersionHistory -PackageId $PackageId -BucketName $BucketName -Limit $MaxUpgradeVersions)
+        $versions = @($history | ForEach-Object { $_.Version })
+
+        if ($versions -notcontains $AvailableVersion) {
+            $versions = @($AvailableVersion) + $versions
+        }
+
+        return @($versions | Select-Object -Unique -First $MaxUpgradeVersions)
+    } catch {
+        Write-Verbose "Failed to retrieve Scoop version history for ${PackageId}: $($_.Exception.Message)"
+        return @($AvailableVersion)
+    }
 }
 
 function Resolve-ScoopReleaseDate {
@@ -103,7 +194,7 @@ function Get-ScoopUpgradeablePackages {
 
     try {
         Write-StageStatus 'Scoop: querying package status...'
-        $statusLines = @(scoop status 2>$null)
+        $statusRecords = @(scoop status 2>$null)
         if ($LASTEXITCODE -ne 0) {
             throw "scoop status exited with code $LASTEXITCODE."
         }
@@ -113,15 +204,15 @@ function Get-ScoopUpgradeablePackages {
     }
 
     $outdatedEntries = [System.Collections.Generic.List[pscustomobject]]::new()
-    foreach ($line in $statusLines) {
-        if ($null -ne $line.PSObject.Properties['Name'] -and
-            $null -ne $line.PSObject.Properties['Installed Version'] -and
-            $null -ne $line.PSObject.Properties['Latest Version']) {
-            $packageId = [string]$line.Name
-            $installedVersionText = [string]$line.'Installed Version'
-            $availableVersionText = [string]$line.'Latest Version'
+    foreach ($record in $statusRecords) {
+        if ($null -ne $record.PSObject.Properties['Name'] -and
+            $null -ne $record.PSObject.Properties['Installed Version'] -and
+            $null -ne $record.PSObject.Properties['Latest Version']) {
+            $packageId = [string]$record.Name
+            $installedVersionText = [string]$record.'Installed Version'
+            $availableVersionText = [string]$record.'Latest Version'
         } else {
-            if ($line -notmatch '^\s*(?<packageId>\S+)\s+(?<installedVersion>\S+)\s+(?<availableVersion>\S+)(?:\s+.*)?$' -or
+            if ($record -notmatch '^\s*(?<packageId>\S+)\s+(?<installedVersion>\S+)\s+(?<availableVersion>\S+)(?:\s+.*)?$' -or
                 $Matches.packageId -eq 'Name' -or
                 $Matches.installedVersion -eq 'Installed') {
                 continue
@@ -181,9 +272,16 @@ function Get-ScoopUpgradeablePackages {
         }
 
         $installedVersion = Resolve-ScoopReleaseDate -PackageId $packageId -Version $installedVersionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
-        $availableVersion = Resolve-ScoopReleaseDate -PackageId $packageId -Version $availableVersionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
-        $target = [UpgradeTarget]::new($availableVersion, (New-ScoopUpgradeCommand -PackageId $packageId -Version $availableVersionText))
-        $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $availableVersion, @($target)))
+        $versionTexts = Get-ScoopAvailableVersions -PackageId $packageId -BucketName $candidateSource -AvailableVersion $availableVersionText -MaxUpgradeVersions $MaxUpgradeVersions
+        $targets = [System.Collections.Generic.List[UpgradeTarget]]::new()
+        foreach ($versionText in $versionTexts) {
+            $availableVersion = Resolve-ScoopReleaseDate -PackageId $packageId -Version $versionText -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
+            $targets.Add([UpgradeTarget]::new($availableVersion, (New-ScoopUpgradeCommand -PackageId $packageId -Version $versionText)))
+        }
+
+        $latestTarget = $targets | Where-Object { $_.PackageVersion.Version -eq $availableVersionText } | Select-Object -First 1
+        $latestVersion = if ($null -ne $latestTarget) { $latestTarget.PackageVersion } else { $targets[0].PackageVersion }
+        $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray()))
     }
 
     return $reportPackages.ToArray()
