@@ -72,17 +72,19 @@ function Write-OutdatedPackageReport {
 
         $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
+            $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
+            if ($isDowngrade) {
+                continue
+            }
+
             $targetIndex++
             $targetPrefix = if ($targetIndex -lt $package.UpgradeTargets.Count) { '+-->' } else { '`-->' }
             Write-Host -NoNewline "  $targetPrefix "
 
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
-            $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
-            $targetColor = if ($isInCooldown -or $isDowngrade) { 'DarkGray' } else { 'Green' }
+
+            $targetColor = 'Green'
             Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version.PadRight($maxVersionLength)) [$($target.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().PadRight($maxDateDisplayLength))]"
-            if ($isDowngrade) {
-                Write-Host -NoNewline -ForegroundColor DarkGray ' ⚠️ older than installed version'
-            }
             if ($isInCooldown) {
                 Write-Host -NoNewline -ForegroundColor DarkGray " 🧊 cooldown ($($target.PackageVersion.GetCooldownRemainingDisplay($CooldownHours)) remaining)"
             }
