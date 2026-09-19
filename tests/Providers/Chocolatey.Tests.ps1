@@ -1,4 +1,4 @@
-$modulePath = Join-Path $PSScriptRoot '..\..\PSPackageOutdatedReporter.psm1'
+﻿$modulePath = Join-Path $PSScriptRoot '..\..\PSPackageOutdatedReporter.psm1'
 Import-Module $modulePath -Force
 
 Describe 'Chocolatey provider' {
@@ -20,6 +20,24 @@ Describe 'Chocolatey provider' {
 
             $result.ReleaseDateStatus | Should -Be 'Found'
             $result.ReleasedAt.ToString('yyyy-MM-dd') | Should -Be '2026-01-02'
+            Assert-MockCalled Invoke-WebRequest -Times 1
+        }
+    }
+
+    It 'caches the Chocolatey info URL' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Invoke-WebRequest {
+                [pscustomobject]@{ Content = @'
+<entry xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices"><content><m:properties><d:ProjectUrl>https://example.com/demo</d:ProjectUrl></m:properties></content></entry>
+'@ }
+            }
+            $cache = @{ schemaVersion = 1; entries = @{} }
+
+            $firstUrl = Resolve-ChocolateyInfoUrl -PackageId 'demo' -Version '1.2.3' -CandidateSource 'chocolatey' -Cache $cache -CacheTtlHours 24
+            $secondUrl = Resolve-ChocolateyInfoUrl -PackageId 'demo' -Version '1.2.3' -CandidateSource 'chocolatey' -Cache $cache -CacheTtlHours 24
+
+            $firstUrl | Should -Be 'https://example.com/demo'
+            $secondUrl | Should -Be 'https://example.com/demo'
             Assert-MockCalled Invoke-WebRequest -Times 1
         }
     }

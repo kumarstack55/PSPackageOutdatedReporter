@@ -30,6 +30,7 @@
                 status = [string]$entry.status
                 metadataSource = [string]$entry.metadataSource
                 cachedAt = [string]$entry.cachedAt
+                infoUrl = [string]$entry.infoUrl
             }
         }
         if ($cache.schemaVersion -ne 1 -or $null -eq $cache.entries) {
@@ -144,6 +145,7 @@ function Resolve-CachedPackageVersion {
         status = $status
         metadataSource = $metadataSource
         cachedAt = [datetime]::UtcNow.ToString('o')
+        infoUrl = if ($null -ne $entry) { [string]$entry.infoUrl } else { $null }
     }
 
     $packageVersion = [PackageVersion]::new($Version, $releasedAt, $status, $metadataSource)
