@@ -61,23 +61,21 @@ function Write-OutdatedPackageReport {
         }
         Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
 
-        $maxVersionLength = @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
+        $visibleTargets = @($package.UpgradeTargets | Where-Object {
+            -not (Test-IsOlderPackageVersion -CandidateVersion $_.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version) -and
+            -not (Test-IsSamePackageVersion -CandidateVersion $_.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version)
+        })
+        $maxVersionLength = @($visibleTargets | ForEach-Object { $_.PackageVersion.Version.Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
-        $maxDateDisplayLength = @($package.UpgradeTargets | ForEach-Object { $_.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length }) |
+        $maxDateDisplayLength = @($visibleTargets | ForEach-Object { $_.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().Length }) |
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
 
         Write-Host -NoNewline "- "
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay())]"
 
-        foreach ($target in $package.UpgradeTargets) {
-            $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
-            $isSameVersion = Test-IsSamePackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
-            if ($isDowngrade -or $isSameVersion) {
-                continue
-            }
-
+        foreach ($target in $visibleTargets) {
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
 
             $targetColor = 'Green'
