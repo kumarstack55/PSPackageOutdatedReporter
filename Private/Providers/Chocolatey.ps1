@@ -63,78 +63,43 @@ function Resolve-ChocolateyInfoUrl {
     param(
         [Parameter(Mandatory)][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$CandidateSource
-        ,[Parameter(Mandatory)][hashtable]$Cache
-        ,[Parameter(Mandatory)][int]$CacheTtlHours
+        [Parameter(Mandatory)][string]$CandidateSource,
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][int]$CacheTtlHours
     )
 
-    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'chocolatey' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
-    $entry = $Cache.entries[$cacheKey]
-    if ($null -ne $entry -and -not [string]::IsNullOrWhiteSpace([string]$entry.infoUrl)) {
-        $cachedAt = [datetime]::MinValue
-        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
-            Write-Verbose "Info URL cache hit: $cacheKey"
-            return [string]$entry.infoUrl
-        }
-    }
-
-    Write-Verbose "Info URL cache miss: $cacheKey"
     if ($CandidateSource -ine 'chocolatey') {
         return Get-PackageInfoUrlFallback -PackageId $PackageId
     }
 
-    try {
-        $escapedId = $PackageId.Replace("'", "''")
-        $escapedVersion = $Version.Replace("'", "''")
-        $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
-        Add-InvocationLogEntry -Type WebRequest -Detail 'community.chocolatey.org Packages OData'
-        $response = & {
-            $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
-        }
-        $xml = [xml]$response.Content
-        $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
-        $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
-        $namespace.AddNamespace('d', 'http://schemas.microsoft.com/ado/2007/08/dataservices')
-
-        foreach ($fieldName in 'ProjectSourceUrl', 'PackageSourceUrl', 'ProjectUrl') {
-            $node = $xml.SelectSingleNode("//m:properties/d:$fieldName", $namespace)
-            if ($null -ne $node -and -not [string]::IsNullOrWhiteSpace($node.InnerText)) {
-                if ($null -eq $Cache.entries[$cacheKey]) {
-                    $Cache.entries[$cacheKey] = @{
-                        version = $Version
-                        releasedAt = $null
-                        firstObservedAt = $null
-                        status = 'Unknown'
-                        metadataSource = 'chocolatey.org'
-                        cachedAt = [datetime]::UtcNow.ToString('o')
-                        infoUrl = $null
-                    }
-                }
-                $Cache.entries[$cacheKey].infoUrl = $node.InnerText
-                return $node.InnerText
+    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'chocolatey' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
+    return Resolve-CachedValue -Cache $Cache -CacheKey $cacheKey -CacheTtlHours $CacheTtlHours -ValueName 'infoUrl' -ResolveValue {
+        try {
+            $escapedId = $PackageId.Replace("'", "''")
+            $escapedVersion = $Version.Replace("'", "''")
+            $uri = "https://community.chocolatey.org/api/v2/Packages(Id='$escapedId',Version='$escapedVersion')"
+            Add-InvocationLogEntry -Type WebRequest -Detail 'community.chocolatey.org Packages OData'
+            $response = & {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
             }
-        }
-    } catch {
-        Write-Verbose "Failed to retrieve Chocolatey info URL for $PackageId ${Version}: $($_.Exception.Message)"
-    }
+            $xml = [xml]$response.Content
+            $namespace = [System.Xml.XmlNamespaceManager]::new($xml.NameTable)
+            $namespace.AddNamespace('m', 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata')
+            $namespace.AddNamespace('d', 'http://schemas.microsoft.com/ado/2007/08/dataservices')
 
-    $fallbackUrl = Get-PackageInfoUrlFallback -PackageId $PackageId
-    if ($null -eq $Cache.entries[$cacheKey]) {
-        $Cache.entries[$cacheKey] = @{
-            version = $Version
-            releasedAt = $null
-            firstObservedAt = $null
-            status = 'Unknown'
-            metadataSource = 'chocolatey.org'
-            cachedAt = [datetime]::UtcNow.ToString('o')
-            infoUrl = $fallbackUrl
+            foreach ($fieldName in 'ProjectSourceUrl', 'PackageSourceUrl', 'ProjectUrl') {
+                $node = $xml.SelectSingleNode("//m:properties/d:$fieldName", $namespace)
+                if ($null -ne $node -and -not [string]::IsNullOrWhiteSpace($node.InnerText)) {
+                    return $node.InnerText
+                }
+            }
+        } catch {
+            Write-Verbose "Failed to retrieve Chocolatey info URL for $PackageId ${Version}: $($_.Exception.Message)"
         }
-    } else {
-        $Cache.entries[$cacheKey].infoUrl = $fallbackUrl
-    }
 
-    return $fallbackUrl
+        return Get-PackageInfoUrlFallback -PackageId $PackageId
+    }
 }
 
 function Get-ChocolateyAvailableVersions {
