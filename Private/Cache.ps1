@@ -12,7 +12,7 @@
     }
 
     if (-not (Test-Path -LiteralPath $Path)) {
-        return @{ schemaVersion = 1; entries = @{} }
+        return @{ schemaVersion = 1; entries = @{}; values = @{} }
     }
 
     try {
@@ -20,6 +20,7 @@
         $cache = @{
             schemaVersion = [int]$cachedJson.schemaVersion
             entries = @{}
+            values = @{}
         }
         foreach ($property in $cachedJson.entries.PSObject.Properties) {
             $entry = $property.Value
@@ -32,6 +33,12 @@
                 cachedAt = [string]$entry.cachedAt
                 infoUrl = [string]$entry.infoUrl
             }
+            if (-not [string]::IsNullOrWhiteSpace([string]$entry.infoUrl)) {
+                $cache['values'][$property.Name] = @{
+                    infoUrl = [string]$entry.infoUrl
+                    cachedAt = [string]$entry.cachedAt
+                }
+            }
         }
         if ($cache.schemaVersion -ne 1 -or $null -eq $cache.entries) {
             throw 'Unsupported cache schema.'
@@ -40,7 +47,7 @@
         return $cache
     } catch {
         Write-Warning "Ignoring invalid release-date cache '$Path': $($_.Exception.Message)"
-        return @{ schemaVersion = 1; entries = @{} }
+        return @{ schemaVersion = 1; entries = @{}; values = @{} }
     }
 }
 
@@ -101,6 +108,52 @@ function ConvertTo-PackageVersionFromCacheEntry {
     }
 
     return $packageVersion
+}
+
+function Resolve-CachedValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][string]$CacheKey,
+        [Parameter(Mandatory)][int]$CacheTtlHours,
+        [Parameter(Mandatory)][string]$ValueName,
+        [Parameter(Mandatory)][scriptblock]$ResolveValue
+    )
+
+    if ($null -eq $Cache['values']) {
+        $Cache['values'] = @{}
+    }
+
+    $entry = $Cache['values'][$CacheKey]
+    if ($null -eq $entry -and 'infoUrl' -eq $ValueName) {
+        $legacyEntry = $Cache.entries[$CacheKey]
+        if ($null -ne $legacyEntry -and -not [string]::IsNullOrWhiteSpace([string]$legacyEntry.infoUrl)) {
+            $entry = @{
+                infoUrl = [string]$legacyEntry.infoUrl
+                cachedAt = [string]$legacyEntry.cachedAt
+            }
+            $Cache['values'][$CacheKey] = $entry
+        }
+    }
+
+    if ($null -ne $entry -and $entry.ContainsKey($ValueName) -and $null -ne $entry[$ValueName]) {
+        $cachedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
+            Write-Verbose "Value cache hit ($ValueName): $CacheKey"
+            return $entry[$ValueName]
+        }
+    }
+
+    Write-Verbose "Value cache miss ($ValueName): $CacheKey"
+    $value = & $ResolveValue
+    if ($null -ne $value) {
+        $Cache['values'][$CacheKey] = @{
+            $ValueName = $value
+            cachedAt = [datetime]::UtcNow.ToString('o')
+        }
+    }
+
+    return $value
 }
 
 function Resolve-CachedPackageVersion {
