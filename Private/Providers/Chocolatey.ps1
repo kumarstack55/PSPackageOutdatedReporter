@@ -64,8 +64,21 @@ function Resolve-ChocolateyInfoUrl {
         [Parameter(Mandatory)][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$CandidateSource
+        ,[Parameter(Mandatory)][hashtable]$Cache
+        ,[Parameter(Mandatory)][int]$CacheTtlHours
     )
 
+    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'chocolatey' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
+    $entry = $Cache.entries[$cacheKey]
+    if ($null -ne $entry -and -not [string]::IsNullOrWhiteSpace([string]$entry.infoUrl)) {
+        $cachedAt = [datetime]::MinValue
+        if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
+            Write-Verbose "Info URL cache hit: $cacheKey"
+            return [string]$entry.infoUrl
+        }
+    }
+
+    Write-Verbose "Info URL cache miss: $cacheKey"
     if ($CandidateSource -ine 'chocolatey') {
         return Get-PackageInfoUrlFallback -PackageId $PackageId
     }
@@ -87,6 +100,18 @@ function Resolve-ChocolateyInfoUrl {
         foreach ($fieldName in 'ProjectSourceUrl', 'PackageSourceUrl', 'ProjectUrl') {
             $node = $xml.SelectSingleNode("//m:properties/d:$fieldName", $namespace)
             if ($null -ne $node -and -not [string]::IsNullOrWhiteSpace($node.InnerText)) {
+                if ($null -eq $Cache.entries[$cacheKey]) {
+                    $Cache.entries[$cacheKey] = @{
+                        version = $Version
+                        releasedAt = $null
+                        firstObservedAt = $null
+                        status = 'Unknown'
+                        metadataSource = 'chocolatey.org'
+                        cachedAt = [datetime]::UtcNow.ToString('o')
+                        infoUrl = $null
+                    }
+                }
+                $Cache.entries[$cacheKey].infoUrl = $node.InnerText
                 return $node.InnerText
             }
         }
@@ -94,7 +119,22 @@ function Resolve-ChocolateyInfoUrl {
         Write-Verbose "Failed to retrieve Chocolatey info URL for $PackageId ${Version}: $($_.Exception.Message)"
     }
 
-    return Get-PackageInfoUrlFallback -PackageId $PackageId
+    $fallbackUrl = Get-PackageInfoUrlFallback -PackageId $PackageId
+    if ($null -eq $Cache.entries[$cacheKey]) {
+        $Cache.entries[$cacheKey] = @{
+            version = $Version
+            releasedAt = $null
+            firstObservedAt = $null
+            status = 'Unknown'
+            metadataSource = 'chocolatey.org'
+            cachedAt = [datetime]::UtcNow.ToString('o')
+            infoUrl = $fallbackUrl
+        }
+    } else {
+        $Cache.entries[$cacheKey].infoUrl = $fallbackUrl
+    }
+
+    return $fallbackUrl
 }
 
 function Get-ChocolateyAvailableVersions {
@@ -190,7 +230,7 @@ function Get-ChocolateyUpgradeablePackages {
 
         $latestTarget = $targets | Where-Object { $_.PackageVersion.Version -eq $availableVersionText } | Select-Object -First 1
         $latestVersion = if ($null -ne $latestTarget) { $latestTarget.PackageVersion } else { $targets[0].PackageVersion }
-        $infoUrl = Resolve-ChocolateyInfoUrl -PackageId $packageId -Version $latestVersion.Version -CandidateSource $candidateSource
+        $infoUrl = Resolve-ChocolateyInfoUrl -PackageId $packageId -Version $latestVersion.Version -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
         $reportPackages.Add([SoftwarePackage]::new('chocolatey', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
