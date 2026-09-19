@@ -40,3 +40,18 @@ function Test-IsOlderPackageVersion {
 
     return $candidateNormalized -lt $baselineNormalized
 }
+
+function Test-IsSamePackageVersion {
+    param(
+        [Parameter(Mandatory)][string]$CandidateVersion,
+        [Parameter(Mandatory)][string]$BaselineVersion
+    )
+
+    $candidateNormalized = Get-NormalizedPackageVersion -Version $CandidateVersion
+    $baselineNormalized = Get-NormalizedPackageVersion -Version $BaselineVersion
+    if ($null -eq $candidateNormalized -or $null -eq $baselineNormalized) {
+        return $false
+    }
+
+    return $candidateNormalized -eq $baselineNormalized
+}
