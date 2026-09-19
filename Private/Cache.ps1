@@ -119,10 +119,12 @@ function Resolve-CachedPackageVersion {
     if ($null -ne $entry) {
         $cachedAt = [datetime]::MinValue
         if ([datetime]::TryParse([string]$entry.cachedAt, [ref]$cachedAt) -and $cachedAt.ToUniversalTime().AddHours($CacheTtlHours) -gt [datetime]::UtcNow) {
+            Write-Verbose "Release-date cache hit: $cacheKey"
             return ConvertTo-PackageVersionFromCacheEntry -Entry $entry
         }
     }
 
+    Write-Verbose "Release-date cache miss: $cacheKey"
     $resolution = & $ResolveReleaseDate
     $releasedAt = $resolution.ReleasedAt
     $status = [string]$resolution.Status
