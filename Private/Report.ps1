@@ -73,7 +73,8 @@ function Write-OutdatedPackageReport {
 
         foreach ($target in $package.UpgradeTargets) {
             $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
-            if ($isDowngrade) {
+            $isSameVersion = Test-IsSamePackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
+            if ($isDowngrade -or $isSameVersion) {
                 continue
             }
 

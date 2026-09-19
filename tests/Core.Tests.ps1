@@ -1,4 +1,4 @@
-$modulePath = Join-Path $PSScriptRoot '..\PSPackageOutdatedReporter.psm1'
+﻿$modulePath = Join-Path $PSScriptRoot '..\PSPackageOutdatedReporter.psm1'
 Import-Module $modulePath -Force
 
 Describe 'Core module behavior' {
@@ -10,6 +10,12 @@ Describe 'Core module behavior' {
 Describe 'Core formatting and reporting' {
     It 'quotes PowerShell arguments' {
         ConvertTo-PowerShellSingleQuotedArgument -Value "O'Reilly.App" | Should -Be "'O''Reilly.App'"
+    }
+
+    It 'treats equivalent normalized versions as the same version' {
+        InModuleScope PSPackageOutdatedReporter {
+            Test-IsSamePackageVersion -CandidateVersion '1.2' -BaselineVersion '1.2.0.0' | Should -BeTrue
+        }
     }
 
     It 'uses display names without package IDs in report names' {
