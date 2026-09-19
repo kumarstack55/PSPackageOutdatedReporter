@@ -57,7 +57,7 @@ function Write-OutdatedPackageReport {
     foreach ($package in ($Packages | Sort-Object DisplayName, CandidateSource)) {
             Write-Host "`n## $(Get-ReportPackageHeading -Package $package)"
         if (-not [string]::IsNullOrWhiteSpace($package.InfoUrl)) {
-            Write-Host $package.InfoUrl
+            Write-Host "<$($package.InfoUrl)>"
         }
         Write-Host "Package Manager: $($package.PackageManagerId), Candidate source: $($package.CandidateSource)"
 
@@ -68,22 +68,19 @@ function Write-OutdatedPackageReport {
             Measure-Object -Maximum |
             Select-Object -ExpandProperty Maximum
 
+        Write-Host -NoNewline "- "
         Write-Host -ForegroundColor Red "$($package.InstalledVersion.Version) [$($package.InstalledVersion.GetEffectiveDateInfo().GetCombinedDisplay())]"
 
-        $targetIndex = 0
         foreach ($target in $package.UpgradeTargets) {
             $isDowngrade = Test-IsOlderPackageVersion -CandidateVersion $target.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version
             if ($isDowngrade) {
                 continue
             }
 
-            $targetIndex++
-            $targetPrefix = if ($targetIndex -lt $package.UpgradeTargets.Count) { '+-->' } else { '`-->' }
-            Write-Host -NoNewline "  $targetPrefix "
-
             $isInCooldown = $target.PackageVersion.IsInCooldown($CooldownHours)
 
             $targetColor = 'Green'
+            Write-Host -NoNewline "  - "
             Write-Host -NoNewline -ForegroundColor $targetColor "$($target.PackageVersion.Version.PadRight($maxVersionLength)) [$($target.PackageVersion.GetEffectiveDateInfo().GetCombinedDisplay().PadRight($maxDateDisplayLength))]"
             if ($isInCooldown) {
                 Write-Host -NoNewline -ForegroundColor DarkGray " 🧊 cooldown ($($target.PackageVersion.GetCooldownRemainingDisplay($CooldownHours)) remaining)"
