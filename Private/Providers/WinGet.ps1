@@ -28,45 +28,50 @@ function Resolve-WinGetInfoUrl {
     param(
         [Parameter(Mandatory)][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$CandidateSource
+        [Parameter(Mandatory)][string]$CandidateSource,
+        [Parameter(Mandatory)][hashtable]$Cache,
+        [Parameter(Mandatory)][int]$CacheTtlHours
     )
 
     if ($CandidateSource -ine 'winget') {
         return Get-PackageInfoUrlFallback -PackageId $PackageId
     }
 
-    try {
-        $locale = 'en-US'
-        Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs version manifest'
-        $versionManifest = & {
-            $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
-        }
-        $defaultLocaleMatch = [regex]::Match($versionManifest.Content, '(?m)^DefaultLocale:\s*(?<value>\S+)')
-        if ($defaultLocaleMatch.Success) {
-            $locale = $defaultLocaleMatch.Groups['value'].Value
+    $cacheKey = Get-ReleaseDateCacheKey -PackageManagerId 'winget' -CandidateSource $CandidateSource -PackageId $PackageId -Version $Version
+    return Resolve-CachedValue -Cache $Cache -CacheKey $cacheKey -CacheTtlHours $CacheTtlHours -ValueName 'infoUrl' -ResolveValue {
+        try {
+            $locale = 'en-US'
+            Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs version manifest'
+            $versionManifest = & {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri (Get-WinGetManifestUrl -PackageId $PackageId -Version $Version) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            }
+            $defaultLocaleMatch = [regex]::Match($versionManifest.Content, '(?m)^DefaultLocale:\s*(?<value>\S+)')
+            if ($defaultLocaleMatch.Success) {
+                $locale = $defaultLocaleMatch.Groups['value'].Value
+            }
+
+            Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs locale manifest'
+            $localeManifest = & {
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri (Get-WinGetLocaleManifestUrl -PackageId $PackageId -Version $Version -Locale $locale) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
+            }
+
+            $releaseNotesUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^ReleaseNotesUrl:\s*(?<value>\S+)')
+            if ($releaseNotesUrlMatch.Success) {
+                return $releaseNotesUrlMatch.Groups['value'].Value
+            }
+
+            $packageUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^PackageUrl:\s*(?<value>\S+)')
+            if ($packageUrlMatch.Success) {
+                return $packageUrlMatch.Groups['value'].Value
+            }
+        } catch {
+            Write-Verbose "Failed to retrieve WinGet info URL for $PackageId ${Version}: $($_.Exception.Message)"
         }
 
-        Add-InvocationLogEntry -Type WebRequest -Detail 'winget-pkgs locale manifest'
-        $localeManifest = & {
-            $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri (Get-WinGetLocaleManifestUrl -PackageId $PackageId -Version $Version -Locale $locale) -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
-        }
-
-        $releaseNotesUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^ReleaseNotesUrl:\s*(?<value>\S+)')
-        if ($releaseNotesUrlMatch.Success) {
-            return $releaseNotesUrlMatch.Groups['value'].Value
-        }
-
-        $packageUrlMatch = [regex]::Match($localeManifest.Content, '(?m)^PackageUrl:\s*(?<value>\S+)')
-        if ($packageUrlMatch.Success) {
-            return $packageUrlMatch.Groups['value'].Value
-        }
-    } catch {
-        Write-Verbose "Failed to retrieve WinGet info URL for $PackageId ${Version}: $($_.Exception.Message)"
+        return Get-PackageInfoUrlFallback -PackageId $PackageId
     }
-
-    return Get-PackageInfoUrlFallback -PackageId $PackageId
 }
 
 function Resolve-WinGetReleaseDate {
@@ -181,7 +186,7 @@ function Get-WinGetUpgradeablePackages {
         }
 
         $latestVersion = $targets[0].PackageVersion
-        $infoUrl = Resolve-WinGetInfoUrl -PackageId $installedPackage.Id -Version $latestVersion.Version -CandidateSource $candidateSource
+        $infoUrl = Resolve-WinGetInfoUrl -PackageId $installedPackage.Id -Version $latestVersion.Version -CandidateSource $candidateSource -Cache $Cache -CacheTtlHours $CacheTtlHours
         $reportPackages.Add([SoftwarePackage]::new('winget', $installedPackage.Id, $installedPackage.Name, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
