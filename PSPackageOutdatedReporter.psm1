@@ -23,10 +23,14 @@ Export-ModuleMember -Function @(
     'New-WinGetUpgradeCommand',
     'New-ChocolateyUpgradeCommand',
     'New-ScoopUpgradeCommand',
+    'New-DotNetToolUpgradeCommand',
     'Get-WinGetUpgradeablePackages',
     'Get-ChocolateyAvailableVersions',
     'Get-ChocolateyUpgradeablePackages',
     'Get-ScoopUpgradeablePackages',
+    'Get-DotNetToolPackageVersions',
+    'Resolve-DotNetToolReleaseDate',
+    'Get-DotNetToolUpgradeablePackages',
     'Write-OutdatedPackageReport',
     'Add-InvocationLogEntry'
 )

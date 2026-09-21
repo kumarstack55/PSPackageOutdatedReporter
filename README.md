@@ -1,6 +1,6 @@
 # PSPackageOutdatedReporter
 
-Reports installed packages that WinGet, Chocolatey, or Scoop can upgrade. For each package it prints:
+Reports installed packages that WinGet, Chocolatey, Scoop, or globally installed dotnet tools can upgrade. For each package it prints:
 
 - Package manager, package name, and candidate source.
 - Installed version and its manifest release date when available.
@@ -21,7 +21,7 @@ You can see how to upgrade packages.
 
 ## Requirements
 
-- Windows with WinGet, Chocolatey, and/or Scoop available.
+- Windows with WinGet, Chocolatey, Scoop, and/or dotnet SDK available.
 - Windows PowerShell 5.1.
 - The `Microsoft.WinGet.Client` module when reporting WinGet packages.
 - Network access to `raw.githubusercontent.com` and `community.chocolatey.org` for release dates.
@@ -78,7 +78,7 @@ Remove-Item (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Start
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\Invoke-ReportPackageOutdated.ps1"
 ```
 
-`-PackageManager` defaults to `WinGet, Chocolatey, Scoop`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
+`-PackageManager` defaults to `WinGet, Chocolatey, Scoop, DotNetTool`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
 
 ## Tests
 
