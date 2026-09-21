@@ -6,6 +6,7 @@ param(
     [ValidateRange(1, 100)]
     [int]$MaxUpgradeVersions = 10,
 
+    [ValidateSet('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool')]
     [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool'),
 
     [string]$Source,
@@ -37,6 +38,7 @@ function Invoke-OutdatedPackageReport {
     [CmdletBinding()]
     param(
         [ValidateRange(1, 100)][int]$MaxUpgradeVersions = 10,
+        [ValidateSet('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool')]
         [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool'),
         [string]$Source,
         [ValidateRange(1, 168)][int]$CacheTtlHours = 24,
