@@ -4,7 +4,7 @@ Import-Module $modulePath -Force
 Describe 'Package provider registry' {
     It 'returns built-in providers in collection order' {
         InModuleScope PSPackageOutdatedReporter {
-            @(Get-PackageProviders | ForEach-Object { $_.Id }) | Should -Be @('WinGet', 'Chocolatey', 'Scoop')
+            @(Get-PackageProviders | ForEach-Object { $_.Id }) | Should -Be @('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool')
         }
     }
 
@@ -24,6 +24,7 @@ Describe 'Outdated package report orchestration' {
             Mock Get-WinGetUpgradeablePackages { @() }
             Mock Get-ChocolateyUpgradeablePackages { @() }
             Mock Get-ScoopUpgradeablePackages { @() }
+            Mock Get-DotNetToolUpgradeablePackages { @() }
             Mock Save-ReleaseDateCache {}
             Mock Write-OutdatedPackageReport {}
             Mock Write-StageStatus {}

@@ -6,7 +6,7 @@ param(
     [ValidateRange(1, 100)]
     [int]$MaxUpgradeVersions = 10,
 
-    [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop'),
+    [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool'),
 
     [string]$Source,
 
@@ -31,12 +31,13 @@ param(
 . "$PSScriptRoot\Private\Providers\WinGet.ps1"
 . "$PSScriptRoot\Private\Providers\Chocolatey.ps1"
 . "$PSScriptRoot\Private\Providers\Scoop.ps1"
+. "$PSScriptRoot\Private\Providers\DotNetTool.ps1"
 
 function Invoke-OutdatedPackageReport {
     [CmdletBinding()]
     param(
         [ValidateRange(1, 100)][int]$MaxUpgradeVersions = 10,
-        [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop'),
+        [string[]]$PackageManager = @('WinGet', 'Chocolatey', 'Scoop', 'DotNetTool'),
         [string]$Source,
         [ValidateRange(1, 168)][int]$CacheTtlHours = 24,
         [string]$CachePath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'PSPackageOutdatedReporter\release-date-cache.json'),
