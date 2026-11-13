@@ -38,7 +38,7 @@ function ConvertTo-HtmlPackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = (7 * 24)
+        [int]$CooldownHours = $script:DefaultCooldownHours
     )
 
     $entries = @()
@@ -71,7 +71,8 @@ function ConvertTo-HtmlPackageReport {
     if ($entries.Count -gt 0) {
         $tableSections = @(
             [pscustomobject]@{ Title = 'Upgradeable packages (sorted by software name)'; Anchor = 'packages-by-name'; SortByName = $true },
-            [pscustomobject]@{ Title = 'Upgradeable packages (sorted by installed version release date, oldest first)'; Anchor = 'packages-by-installed-date'; SortByName = $false }
+            [pscustomobject]@{ Title = 'Upgradeable packages (sorted by installed version release date, oldest first)'; Anchor = 'packages-by-installed-date'; SortByName = $false },
+            [pscustomobject]@{ Title = 'Upgradeable packages (outside cooldown)'; Anchor = 'packages-outside-cooldown'; SortByName = $true; OutsideCooldownOnly = $true }
         )
         $null = $builder.AppendLine('<nav aria-label="Table of contents">')
         $null = $builder.AppendLine('<h2>Contents</h2>')
@@ -108,9 +109,13 @@ function ConvertTo-HtmlPackageReport {
     )
 
     foreach ($tableSection in $tableSections) {
+        $sectionColumnHeaders = $columnHeaders
+        if ($tableSection.OutsideCooldownOnly) {
+            $sectionColumnHeaders = @('Manager', 'Name', 'Installed version', 'Available upgrade versions')
+        }
         $null = $builder.AppendLine("<h2 id=`"$($tableSection.Anchor)`">$(ConvertTo-HtmlReportText $tableSection.Title)</h2>")
         $null = $builder.AppendLine('<table><thead><tr>')
-        foreach ($columnHeader in $columnHeaders) {
+        foreach ($columnHeader in $sectionColumnHeaders) {
             $null = $builder.AppendLine("<th>$(ConvertTo-HtmlReportText $columnHeader)</th>")
         }
         $null = $builder.AppendLine('</tr></thead><tbody>')
@@ -121,23 +126,44 @@ function ConvertTo-HtmlPackageReport {
         else {
             $tableEntries = @($entries | Sort-Object -Property @{ Expression = { $_.Package.InstalledVersion.GetEffectiveDateInfo().Date } })
         }
+        if ($tableSection.OutsideCooldownOnly) {
+            $tableEntries = @($entries | Where-Object {
+                Test-ReportPackageHasOutOfCooldownTargets -Package $_.Package -CooldownHours $CooldownHours
+            })
+        }
 
+        if ($tableEntries.Count -eq 0) {
+            $emptyMessage = 'No upgradeable packages outside cooldown.'
+            $null = $builder.AppendLine("<tr><td colspan=`"$($sectionColumnHeaders.Count)`">$(ConvertTo-HtmlReportText -Value $emptyMessage)</td></tr>")
+        }
         foreach ($entry in $tableEntries) {
             $package = $entry.Package
-            $rowValues = @(
-                $package.PackageManagerId,
-                $package.DisplayName,
-                $package.InstalledVersion.Version,
-                $package.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
-                $package.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel(),
-                $package.LatestVersion.Version,
-                $package.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
-                $package.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel()
-            )
+            if ($tableSection.OutsideCooldownOnly) {
+                $availableUpgradeVersions = (Get-ReportOutOfCooldownUpgradeTargets -Package $package -CooldownHours $CooldownHours |
+                    ForEach-Object { $_.PackageVersion.Version }) -join ', '
+                $rowValues = @(
+                    $package.PackageManagerId,
+                    $package.DisplayName,
+                    $package.InstalledVersion.Version,
+                    $availableUpgradeVersions
+                )
+            }
+            else {
+                $rowValues = @(
+                    $package.PackageManagerId,
+                    $package.DisplayName,
+                    $package.InstalledVersion.Version,
+                    $package.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
+                    $package.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel(),
+                    $package.LatestVersion.Version,
+                    $package.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
+                    $package.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel()
+                )
+            }
             $null = $builder.AppendLine('<tr>')
-            for ($columnIndex = 0; $columnIndex -lt $columnHeaders.Count; $columnIndex++) {
+            for ($columnIndex = 0; $columnIndex -lt $sectionColumnHeaders.Count; $columnIndex++) {
                 $value = $rowValues[$columnIndex]
-                if ($columnHeaders[$columnIndex] -eq 'Name') {
+                if ($sectionColumnHeaders[$columnIndex] -eq 'Name') {
                     $encodedValue = ConvertTo-HtmlReportText -Value $value
                     $cell = "<a href=`"#$($entry.Anchor)`">$encodedValue</a>"
                 }
@@ -167,10 +193,7 @@ function ConvertTo-HtmlPackageReport {
         $null = $builder.AppendLine('<ul class="versions">')
         $null = $builder.AppendLine("<li class=`"installed`">$installedVersion [$installedDate]")
 
-        $visibleTargets = @($package.UpgradeTargets | Where-Object {
-            -not (Test-IsOlderPackageVersion -CandidateVersion $_.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version) -and
-            -not (Test-IsSamePackageVersion -CandidateVersion $_.PackageVersion.Version -BaselineVersion $package.InstalledVersion.Version)
-        })
+        $visibleTargets = Get-ReportVisibleUpgradeTargets -Package $package
         if ($visibleTargets.Count -gt 0) {
             $null = $builder.AppendLine('<ul>')
         }
@@ -207,7 +230,7 @@ function Write-HtmlPackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = (7 * 24)
+        [int]$CooldownHours = $script:DefaultCooldownHours
     )
 
     $reportPath = Get-HtmlReportPath

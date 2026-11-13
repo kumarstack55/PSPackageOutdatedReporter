@@ -80,7 +80,7 @@ Remove-Item (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Start
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\Invoke-ReportPackageOutdated.ps1"
 ```
 
-`-PackageManager` defaults to `WinGet, Chocolatey, Scoop, DotNetTool`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
+`-PackageManager` defaults to `WinGet, Chocolatey, Scoop, DotNetTool`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`. `-CooldownHours` defaults to `168` (7 days).
 
 `-OutputFormat` defaults to `Console`. Use `-OutputFormat Html` to write a single report to `Documents\PSPackageOutdatedReporter\Reports\report.html`; the report is overwritten on each run. Progress remains in the console. Add `-OpenReport` to open the generated HTML report in the default browser. `-OpenReport` requires `-OutputFormat Html`.
 

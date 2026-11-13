@@ -19,13 +19,18 @@ param(
     [switch]$ClearCache,
 
     [ValidateRange(0, 8760)]
-    [int]$CooldownHours = (7 * 24),
+    [int]$CooldownHours,
 
     [ValidateSet('Console', 'Html')]
     [string]$OutputFormat = 'Console',
 
     [switch]$OpenReport
 )
+
+. "$PSScriptRoot\Private\Defaults.ps1"
+if (-not $PSBoundParameters.ContainsKey('CooldownHours')) {
+    $CooldownHours = $script:DefaultCooldownHours
+}
 
 . "$PSScriptRoot\Private\Formatting.ps1"
 . "$PSScriptRoot\Private\InvocationLog.ps1"
@@ -50,7 +55,7 @@ function Invoke-OutdatedPackageReport {
         [ValidateRange(1, 168)][int]$CacheTtlHours = 24,
         [string]$CachePath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'PSPackageOutdatedReporter\release-date-cache.json'),
         [switch]$ClearCache,
-        [ValidateRange(0, 8760)][int]$CooldownHours = (7 * 24),
+        [ValidateRange(0, 8760)][int]$CooldownHours = $script:DefaultCooldownHours,
         [ValidateSet('Console', 'Html')][string]$OutputFormat = 'Console',
         [switch]$OpenReport
     )
