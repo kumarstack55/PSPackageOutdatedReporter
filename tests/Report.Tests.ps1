@@ -16,6 +16,25 @@ Describe 'Package provider registry' {
 }
 
 Describe 'Outdated package report orchestration' {
+    It 'uses the shared seven-day cooldown default' {
+        InModuleScope PSPackageOutdatedReporter {
+            $script:DefaultCooldownHours | Should -Be 168
+
+            $cache = @{ schemaVersion = 1; entries = @{} }
+            Mock Get-ReleaseDateCache { $cache }
+            Mock Get-WinGetUpgradeablePackages { @() }
+            Mock Save-ReleaseDateCache {}
+            Mock Write-OutdatedPackageReport {}
+            Mock Write-StageStatus {}
+
+            Invoke-OutdatedPackageReport -PackageManager WinGet -CachePath (Join-Path $TestDrive 'cache.json')
+
+            Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
+                $CooldownHours -eq $script:DefaultCooldownHours
+            }
+        }
+    }
+
     It 'collects selected providers and forwards their packages to the report' {
         InModuleScope PSPackageOutdatedReporter {
             $cache = @{ schemaVersion = 1; entries = @{} }
