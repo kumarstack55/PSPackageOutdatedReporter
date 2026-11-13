@@ -18,6 +18,31 @@ function Write-OutdatedPackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
+        [int]$CooldownHours = (7 * 24),
+        [ValidateSet('Console', 'Html')][string]$OutputFormat = 'Console',
+        [switch]$OpenReport
+    )
+
+    if ($OpenReport -and $OutputFormat -ne 'Html') {
+        throw '-OpenReport can only be used with -OutputFormat Html.'
+    }
+
+    if ($OutputFormat -eq 'Html') {
+        $reportPath = Write-HtmlPackageReport -Packages $Packages -CooldownHours $CooldownHours
+        Write-Host "HTML report saved to: $reportPath"
+        if ($OpenReport) {
+            Start-Process -FilePath $reportPath -ErrorAction Stop
+        }
+        return
+    }
+
+    Write-ConsolePackageReport -Packages $Packages -CooldownHours $CooldownHours
+}
+
+function Write-ConsolePackageReport {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = (7 * 24)
     )
 

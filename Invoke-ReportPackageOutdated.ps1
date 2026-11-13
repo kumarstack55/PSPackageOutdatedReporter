@@ -19,7 +19,12 @@ param(
     [switch]$ClearCache,
 
     [ValidateRange(0, 8760)]
-    [int]$CooldownHours = (7 * 24)
+    [int]$CooldownHours = (7 * 24),
+
+    [ValidateSet('Console', 'Html')]
+    [string]$OutputFormat = 'Console',
+
+    [switch]$OpenReport
 )
 
 . "$PSScriptRoot\Private\Formatting.ps1"
@@ -28,6 +33,7 @@ param(
 . "$PSScriptRoot\Private\Cache.ps1"
 . "$PSScriptRoot\Private\Version.ps1"
 . "$PSScriptRoot\Private\Report.ps1"
+. "$PSScriptRoot\Private\HtmlReport.ps1"
 . "$PSScriptRoot\Private\Providers.ps1"
 . "$PSScriptRoot\Private\Providers\WinGet.ps1"
 . "$PSScriptRoot\Private\Providers\Chocolatey.ps1"
@@ -44,8 +50,14 @@ function Invoke-OutdatedPackageReport {
         [ValidateRange(1, 168)][int]$CacheTtlHours = 24,
         [string]$CachePath = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'PSPackageOutdatedReporter\release-date-cache.json'),
         [switch]$ClearCache,
-        [ValidateRange(0, 8760)][int]$CooldownHours = (7 * 24)
+        [ValidateRange(0, 8760)][int]$CooldownHours = (7 * 24),
+        [ValidateSet('Console', 'Html')][string]$OutputFormat = 'Console',
+        [switch]$OpenReport
     )
+
+    if ($OpenReport -and $OutputFormat -ne 'Html') {
+        throw '-OpenReport can only be used with -OutputFormat Html.'
+    }
 
     $providers = foreach ($providerId in $PackageManager) {
         $provider = Get-PackageProvider -Id $providerId
@@ -70,7 +82,7 @@ function Invoke-OutdatedPackageReport {
     Write-StageStatus 'Saving release date cache...'
     Save-ReleaseDateCache -Cache $cache -Path $CachePath
     Write-StageStatus 'Rendering report...'
-    Write-OutdatedPackageReport -Packages $packages.ToArray() -CooldownHours $CooldownHours
+    Write-OutdatedPackageReport -Packages $packages.ToArray() -CooldownHours $CooldownHours -OutputFormat $OutputFormat -OpenReport:$OpenReport
     $global:LASTEXITCODE = 0
 }
 

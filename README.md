@@ -1,6 +1,6 @@
 # PSPackageOutdatedReporter
 
-Reports installed packages that WinGet, Chocolatey, Scoop, or globally installed dotnet tools can upgrade. For each package it prints:
+Reports installed packages that WinGet, Chocolatey, Scoop, or globally installed dotnet tools can upgrade. For each package it includes:
 
 - Package manager, package name, and candidate source.
 - Installed version and its manifest release date when available.
@@ -72,6 +72,8 @@ Remove-Item (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Start
 .\Invoke-ReportPackageOutdated.ps1 -PackageManager Scoop
 .\Invoke-ReportPackageOutdated.ps1 -Source winget -MaxUpgradeVersions 1
 .\Invoke-ReportPackageOutdated.ps1 -ClearCache
+.\Invoke-ReportPackageOutdated.ps1 -OutputFormat Html
+.\Invoke-ReportPackageOutdated.ps1 -OutputFormat Html -OpenReport
 
 # or
 
@@ -79,6 +81,8 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\In
 ```
 
 `-PackageManager` defaults to `WinGet, Chocolatey, Scoop, DotNetTool`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`.
+
+`-OutputFormat` defaults to `Console`. Use `-OutputFormat Html` to write a single report to `Documents\PSPackageOutdatedReporter\Reports\report.html`; the report is overwritten on each run. Progress remains in the console. Add `-OpenReport` to open the generated HTML report in the default browser. `-OpenReport` requires `-OutputFormat Html`.
 
 ## Tests
 
