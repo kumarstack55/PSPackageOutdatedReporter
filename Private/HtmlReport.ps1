@@ -74,6 +74,7 @@ function ConvertTo-HtmlPackageReport {
             [pscustomobject]@{ Title = 'Upgradeable packages (sorted by installed version release date, oldest first)'; Anchor = 'packages-by-installed-date'; SortByName = $false },
             [pscustomobject]@{ Title = 'Upgradeable packages (outside cooldown)'; Anchor = 'packages-outside-cooldown'; SortByName = $true; OutsideCooldownOnly = $true }
         )
+
         $null = $builder.AppendLine('<nav aria-label="Table of contents">')
         $null = $builder.AppendLine('<h2>Contents</h2>')
         $null = $builder.AppendLine('<ul>')
@@ -108,73 +109,77 @@ function ConvertTo-HtmlPackageReport {
         'Latest relative date'
     )
 
-    foreach ($tableSection in $tableSections) {
-        $sectionColumnHeaders = $columnHeaders
-        if ($tableSection.OutsideCooldownOnly) {
-            $sectionColumnHeaders = @('Manager', 'Name', 'Installed version', 'Available upgrade versions')
-        }
-        $null = $builder.AppendLine("<h2 id=`"$($tableSection.Anchor)`">$(ConvertTo-HtmlReportText $tableSection.Title)</h2>")
-        $null = $builder.AppendLine('<table><thead><tr>')
-        foreach ($columnHeader in $sectionColumnHeaders) {
-            $null = $builder.AppendLine("<th>$(ConvertTo-HtmlReportText $columnHeader)</th>")
-        }
-        $null = $builder.AppendLine('</tr></thead><tbody>')
-
-        if ($tableSection.SortByName) {
-            $tableEntries = $entries
-        }
-        else {
-            $tableEntries = @($entries | Sort-Object -Property @{ Expression = { $_.Package.InstalledVersion.GetEffectiveDateInfo().Date } })
-        }
-        if ($tableSection.OutsideCooldownOnly) {
-            $tableEntries = @($entries | Where-Object {
-                Test-ReportPackageHasOutOfCooldownTargets -Package $_.Package -CooldownHours $CooldownHours
-            })
-        }
-
-        if ($tableEntries.Count -eq 0) {
-            $emptyMessage = 'No upgradeable packages outside cooldown.'
-            $null = $builder.AppendLine("<tr><td colspan=`"$($sectionColumnHeaders.Count)`">$(ConvertTo-HtmlReportText -Value $emptyMessage)</td></tr>")
-        }
-        foreach ($entry in $tableEntries) {
-            $package = $entry.Package
+    if ($entries.Count -gt 0) {
+        foreach ($tableSection in $tableSections) {
+            $sectionColumnHeaders = $columnHeaders
             if ($tableSection.OutsideCooldownOnly) {
-                $availableUpgradeVersions = (Get-ReportOutOfCooldownUpgradeTargets -Package $package -CooldownHours $CooldownHours |
-                    ForEach-Object { $_.PackageVersion.Version }) -join ', '
-                $rowValues = @(
-                    $package.PackageManagerId,
-                    $package.DisplayName,
-                    $package.InstalledVersion.Version,
-                    $availableUpgradeVersions
-                )
+                $sectionColumnHeaders = @('Manager', 'Name', 'Installed version', 'Available upgrade versions')
+            }
+
+            if ($tableSection.SortByName) {
+                $tableEntries = $entries
             }
             else {
-                $rowValues = @(
-                    $package.PackageManagerId,
-                    $package.DisplayName,
-                    $package.InstalledVersion.Version,
-                    $package.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
-                    $package.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel(),
-                    $package.LatestVersion.Version,
-                    $package.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
-                    $package.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel()
-                )
+                $tableEntries = @($entries | Sort-Object -Property @{ Expression = { $_.Package.InstalledVersion.GetEffectiveDateInfo().Date } })
             }
-            $null = $builder.AppendLine('<tr>')
-            for ($columnIndex = 0; $columnIndex -lt $sectionColumnHeaders.Count; $columnIndex++) {
-                $value = $rowValues[$columnIndex]
-                if ($sectionColumnHeaders[$columnIndex] -eq 'Name') {
-                    $encodedValue = ConvertTo-HtmlReportText -Value $value
-                    $cell = "<a href=`"#$($entry.Anchor)`">$encodedValue</a>"
-                }
-                else {
-                    $cell = ConvertTo-HtmlReportText -Value ([string]$value)
-                }
-                $null = $builder.AppendLine("<td>$cell</td>")
+            if ($tableSection.OutsideCooldownOnly) {
+                $tableEntries = @($entries | Where-Object {
+                    Test-ReportPackageHasOutOfCooldownTargets -Package $_.Package -CooldownHours $CooldownHours
+                })
             }
-            $null = $builder.AppendLine('</tr>')
+
+            $null = $builder.AppendLine("<h2 id=`"$($tableSection.Anchor)`">$(ConvertTo-HtmlReportText $tableSection.Title)</h2>")
+            
+            if ($tableEntries.Count -gt 0) {
+                $null = $builder.AppendLine('<table><thead><tr>')
+                foreach ($columnHeader in $sectionColumnHeaders) {
+                    $null = $builder.AppendLine("<th>$(ConvertTo-HtmlReportText $columnHeader)</th>")
+                }
+                $null = $builder.AppendLine('</tr></thead><tbody>')
+                foreach ($entry in $tableEntries) {
+                    $package = $entry.Package
+                    if ($tableSection.OutsideCooldownOnly) {
+                        $availableUpgradeVersions = (Get-ReportOutOfCooldownUpgradeTargets -Package $package -CooldownHours $CooldownHours |
+                            ForEach-Object { $_.PackageVersion.Version }) -join ', '
+                        $rowValues = @(
+                            $package.PackageManagerId,
+                            $package.DisplayName,
+                            $package.InstalledVersion.Version,
+                            $availableUpgradeVersions
+                        )
+                    }
+                    else {
+                        $rowValues = @(
+                            $package.PackageManagerId,
+                            $package.DisplayName,
+                            $package.InstalledVersion.Version,
+                            $package.InstalledVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
+                            $package.InstalledVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel(),
+                            $package.LatestVersion.Version,
+                            $package.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay(),
+                            $package.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel()
+                        )
+                    }
+                    $null = $builder.AppendLine('<tr>')
+                    for ($columnIndex = 0; $columnIndex -lt $sectionColumnHeaders.Count; $columnIndex++) {
+                        $value = $rowValues[$columnIndex]
+                        if ($sectionColumnHeaders[$columnIndex] -eq 'Name') {
+                            $encodedValue = ConvertTo-HtmlReportText -Value $value
+                            $cell = "<a href=`"#$($entry.Anchor)`">$encodedValue</a>"
+                        }
+                        else {
+                            $cell = ConvertTo-HtmlReportText -Value ([string]$value)
+                        }
+                        $null = $builder.AppendLine("<td>$cell</td>")
+                    }
+                    $null = $builder.AppendLine('</tr>')
+                }
+                $null = $builder.AppendLine('</tbody></table>')
+            }
+            else {
+                $null = $builder.AppendLine('<p>No upgradeable packages outside cooldown.</p>')
+            }
         }
-        $null = $builder.AppendLine('</tbody></table>')
     }
 
     $null = $builder.AppendLine('<h2 id="package-details">Package details</h2>')
