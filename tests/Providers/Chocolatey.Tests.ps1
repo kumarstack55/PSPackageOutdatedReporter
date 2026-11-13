@@ -4,7 +4,7 @@ Import-Module $modulePath -Force
 Describe 'Chocolatey provider' {
     It 'builds upgrade commands with escaped arguments' {
         New-ChocolateyUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
-            Should -Be "sudo choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"
+            Should -Be "choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"
     }
 
     It 'parses a published Chocolatey date from the HTTP response' {
