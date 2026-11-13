@@ -40,8 +40,38 @@ Describe 'Outdated package report orchestration' {
             Assert-MockCalled Get-ChocolateyUpgradeablePackages -Times 0 -Exactly
             Assert-MockCalled Save-ReleaseDateCache -Times 1 -Exactly
             Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
-                $Packages.Count -eq 0 -and $CooldownHours -eq 48
+                $Packages.Count -eq 0 -and $CooldownHours -eq 48 -and $OutputFormat -eq 'Console' -and -not $OpenReport
             }
+        }
+    }
+
+    It 'forwards the selected Html format to the report' {
+        InModuleScope PSPackageOutdatedReporter {
+            $cache = @{ schemaVersion = 1; entries = @{} }
+
+            Mock Get-ReleaseDateCache { $cache }
+            Mock Get-WinGetUpgradeablePackages { @() }
+            Mock Save-ReleaseDateCache {}
+            Mock Write-OutdatedPackageReport {}
+            Mock Write-StageStatus {}
+
+            Invoke-OutdatedPackageReport -PackageManager WinGet -CachePath (Join-Path $TestDrive 'cache.json') -OutputFormat Html
+
+            Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
+                $Packages.Count -eq 0 -and $OutputFormat -eq 'Html' -and -not $OpenReport
+            }
+        }
+    }
+
+    It 'rejects opening a report in Console format before reading the cache' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-ReleaseDateCache {}
+
+            {
+                Invoke-OutdatedPackageReport -OpenReport -CachePath (Join-Path $TestDrive 'cache.json')
+            } | Should -Throw '*-OpenReport can only be used with -OutputFormat Html*'
+
+            Assert-MockCalled Get-ReleaseDateCache -Times 0 -Exactly
         }
     }
 
