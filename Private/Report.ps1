@@ -54,6 +54,21 @@ function Get-ReportPackagesWithOutOfCooldownTargets {
     })
 }
 
+function Get-ReportPackageManagerSummary {
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
+        [int]$CooldownHours = $script:DefaultCooldownHours
+    )
+
+    foreach ($group in ($Packages | Group-Object -Property PackageManagerId | Sort-Object Name)) {
+        [pscustomobject]@{
+            Manager = $group.Name
+            UpgradeablePackages = $group.Count
+            OutsideCooldown = @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $group.Group -CooldownHours $CooldownHours).Count
+        }
+    }
+}
+
 function Write-OutdatedPackageReport {
     [CmdletBinding()]
     param(
@@ -100,6 +115,12 @@ function Write-ConsolePackageReport {
         @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
         @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } }
     $reportColumnNames = 'Manager', 'Name', 'InstalledVersion', 'InstalledVersionReleaseDate', 'InstalledVersionReleaseRelative', 'LatestVersion', 'LatestVersionReleaseDate', 'LatestVersionReleaseRelative'
+
+    Write-Host '## Package manager summary'
+    Get-ReportPackageManagerSummary -Packages $Packages -CooldownHours $CooldownHours |
+        Format-Table -AutoSize |
+        Out-String -Width 4096 |
+        Out-Host
 
     Write-Host '## Upgradeable packages (sorted by software name)'
     $Packages |

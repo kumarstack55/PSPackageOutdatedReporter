@@ -39,20 +39,25 @@ Clone the repository and create a shortcut in the current user's Startup folder.
 Run the following in Windows PowerShell 5.1. Replace the repository URL if your repository is hosted elsewhere.
 
 ```powershell
-$repoPath = Join-Path $HOME 'PSPackageOutdatedReporter'
-git clone https://github.com/wabik/PSPackageOutdatedReporter.git $repoPath
-Set-Location $repoPath
+$repositoryBaseDirectory = $HOME
+
+git clone https://github.com/kumarstack55/PSPackageOutdatedReporter.git "${repositoryBaseDirectory}\PSPackageOutdatedReporter"
+Set-Location "${repositoryBaseDirectory}\PSPackageOutdatedReporter"
+$repositoryLocation = Get-Location
+$repositoryPath = $repositoryLocation.Path
 
 $startupPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
 $shortcutPath = Join-Path $startupPath 'PSPackageOutdatedReporter.lnk'
-$scriptPath = Join-Path $repoPath 'Invoke-ReportPackageOutdated.ps1'
-$powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$scriptPath = Join-Path $repositoryPath 'Invoke-ReportPackageOutdated.ps1'
+
+$powershellCommand = Get-Command powershell.exe
+$powershellPath = $powershellCommand.Source
 
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $powershellPath
-$shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "& ''{0}''; Read-Host ''Press Enter to close''"' -f $scriptPath
-$shortcut.WorkingDirectory = $repoPath
+$shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "& ''{0}'' -OutputFormat Html -OpenReport; Read-Host ''Press Enter to close''"' -f $scriptPath
+$shortcut.WorkingDirectory = $repositoryPath
 $shortcut.Description = 'Report outdated packages'
 $shortcut.Save()
 ```
@@ -83,6 +88,8 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\In
 `-PackageManager` defaults to `WinGet, Chocolatey, Scoop, DotNetTool`. `-Source` filters by the candidate catalog source. `-MaxUpgradeVersions` defaults to `10`; a manager may expose fewer available versions for a package. `-CacheTtlHours` defaults to `24`. `-CooldownHours` defaults to `168` (7 days).
 
 `-OutputFormat` defaults to `Console`. Use `-OutputFormat Html` to write a single report to `Documents\PSPackageOutdatedReporter\Reports\report.html`; the report is overwritten on each run. Progress remains in the console. Add `-OpenReport` to open the generated HTML report in the default browser. `-OpenReport` requires `-OutputFormat Html`.
+
+The report starts with a summary by package manager of upgradeable packages and those with at least one upgrade target outside cooldown. It includes only managers with reported upgradeable packages; source and version limits apply as they do to the detailed report.
 
 ## Tests
 

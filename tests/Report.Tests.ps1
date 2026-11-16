@@ -15,6 +15,52 @@ Describe 'Package provider registry' {
     }
 }
 
+Describe 'Package manager summary' {
+    It 'counts packages once per manager when at least one visible target is outside cooldown' {
+        InModuleScope PSPackageOutdatedReporter {
+            $installed = [PackageVersion]::new('1.0', $null, 'NotPublished', 'test')
+            $old = [PackageVersion]::new('2.0', [datetime]::Now.AddDays(-10), 'Published', 'test')
+            $older = [PackageVersion]::new('1.5', [datetime]::Now.AddDays(-10), 'Published', 'test')
+            $recent = [PackageVersion]::new('3.0', [datetime]::Now, 'Published', 'test')
+            $same = [PackageVersion]::new('1.0', [datetime]::Now.AddDays(-10), 'Published', 'test')
+            $packages = @(
+                [SoftwarePackage]::new('winget', 'a', 'A', 'winget', $null, $installed, $recent, @([UpgradeTarget]::new($recent, 'a'), [UpgradeTarget]::new($old, 'a'), [UpgradeTarget]::new($older, 'a')), $null)
+                [SoftwarePackage]::new('winget', 'b', 'B', 'winget', $null, $installed, $recent, @([UpgradeTarget]::new($recent, 'b'), [UpgradeTarget]::new($same, 'b')), $null)
+                [SoftwarePackage]::new('scoop', 'c', 'C', 'main', $null, $installed, $recent, @([UpgradeTarget]::new($recent, 'c')), $null)
+            )
+
+            $summary = @(Get-ReportPackageManagerSummary -Packages $packages -CooldownHours 168)
+
+            $summary.Count | Should -Be 2
+            $summary[0].Manager | Should -Be 'scoop'
+            $summary[0].UpgradeablePackages | Should -Be 1
+            $summary[0].OutsideCooldown | Should -Be 0
+            $summary[1].Manager | Should -Be 'winget'
+            $summary[1].UpgradeablePackages | Should -Be 2
+            $summary[1].OutsideCooldown | Should -Be 1
+            @(Get-ReportPackageManagerSummary -Packages @()).Count | Should -Be 0
+        }
+    }
+
+    It 'writes the summary before the detailed console table' {
+        InModuleScope PSPackageOutdatedReporter {
+            $installed = [PackageVersion]::new('1.0', $null, 'NotPublished', 'test')
+            $latest = [PackageVersion]::new('2.0', [datetime]::Now.AddDays(-10), 'Published', 'test')
+            $package = [SoftwarePackage]::new('winget', 'demo', 'Demo', 'winget', $null, $installed, $latest, @([UpgradeTarget]::new($latest, 'upgrade demo')), $null)
+            Mock Get-ReportPackageManagerSummary {
+                [pscustomobject]@{ Manager = 'winget'; UpgradeablePackages = 1; OutsideCooldown = 1 }
+            }
+
+            $output = (Write-ConsolePackageReport -Packages @($package) -CooldownHours 168 6>&1 | Out-String)
+
+            $output | Should -Match '(?s)## Package manager summary.*?## Upgradeable packages \(sorted by software name\)'
+            Assert-MockCalled Get-ReportPackageManagerSummary -Times 1 -Exactly -ParameterFilter {
+                $Packages.Count -eq 1 -and $CooldownHours -eq 168
+            }
+        }
+    }
+}
+
 Describe 'Outdated package report orchestration' {
     It 'uses the shared seven-day cooldown default' {
         InModuleScope PSPackageOutdatedReporter {

@@ -169,6 +169,7 @@ function ConvertTo-HtmlPackageReport {
         $null = $builder.AppendLine('<nav aria-label="Table of contents">')
         $null = $builder.AppendLine('<h2>Contents</h2>')
         $null = $builder.AppendLine('<ul>')
+        $null = $builder.AppendLine('<li><a href="#package-manager-summary">Package manager summary</a></li>')
         foreach ($tableSection in $tableSections) {
             $sectionTitle = ConvertTo-HtmlReportText -Value $tableSection.Title
             $null = $builder.AppendLine("<li><a href=`"#$($tableSection.Anchor)`">$sectionTitle</a></li>")
@@ -188,6 +189,14 @@ function ConvertTo-HtmlPackageReport {
         $null = $builder.AppendLine('</body></html>')
         return $builder.ToString()
     }
+
+    $null = $builder.AppendLine('<h2 id="package-manager-summary">Package manager summary</h2>')
+    $null = $builder.AppendLine('<table><thead><tr><th>Manager</th><th>Upgradeable packages</th><th>Outside cooldown</th></tr></thead><tbody>')
+    foreach ($summary in (Get-ReportPackageManagerSummary -Packages $Packages -CooldownHours $CooldownHours)) {
+        $manager = ConvertTo-HtmlReportText -Value $summary.Manager
+        $null = $builder.AppendLine("<tr><td>$manager</td><td>$($summary.UpgradeablePackages)</td><td>$($summary.OutsideCooldown)</td></tr>")
+    }
+    $null = $builder.AppendLine('</tbody></table>')
 
     $columnHeaders = @(
         'Manager',

@@ -18,7 +18,7 @@ Describe 'HTML package report' {
             $html = Get-Content -LiteralPath $path -Raw
 
             $path | Should -Be $testReportPath
-            $html | Should -Match '(?s)<h1>Upgradeable packages</h1>\s*<nav aria-label="Table of contents">\s*<h2>Contents</h2>.*?<a href="#packages-by-name">Upgradeable packages \(sorted by software name\)</a>.*?<a href="#packages-by-installed-date">Upgradeable packages \(sorted by installed version release date, oldest first\)</a>.*?<a href="#packages-outside-cooldown">Upgradeable packages \(outside cooldown\)</a>.*?<a href="#package-details">Package details</a>.*?<a href="#package-0">Demo &amp; &lt;App&gt;</a>'
+            $html | Should -Match '(?s)<h1>Upgradeable packages</h1>\s*<nav aria-label="Table of contents">\s*<h2>Contents</h2>.*?<a href="#package-manager-summary">Package manager summary</a>.*?<a href="#packages-by-name">Upgradeable packages \(sorted by software name\)</a>.*?<a href="#packages-by-installed-date">Upgradeable packages \(sorted by installed version release date, oldest first\)</a>.*?<a href="#packages-outside-cooldown">Upgradeable packages \(outside cooldown\)</a>.*?<a href="#package-details">Package details</a>.*?<a href="#package-0">Demo &amp; &lt;App&gt;</a>'
             $html | Should -Match '<h2 id="packages-by-name">'
             $html | Should -Match '<h2 id="packages-by-installed-date">'
             $html | Should -Match '<h2 id="packages-outside-cooldown">'
@@ -74,13 +74,15 @@ Describe 'HTML package report' {
             $coolingDown.FirstObservedAt = [datetime]::Now
             $eligiblePackage = [SoftwarePackage]::new('winget', 'eligible', 'Eligible App', 'winget', $null, $installed, $eligible, @([UpgradeTarget]::new($eligible, 'winget upgrade eligible')), $null)
             $coolingDownPackage = [SoftwarePackage]::new('winget', 'cooling', 'Cooling App', 'winget', $null, $installed, $coolingDown, @([UpgradeTarget]::new($coolingDown, 'winget upgrade cooling')), $null)
+            $otherManagerPackage = [SoftwarePackage]::new('scoop&<test>', 'other', 'Other App', 'main', $null, $installed, $coolingDown, @([UpgradeTarget]::new($coolingDown, 'scoop update other')), $null)
 
-            $packages = @($eligiblePackage, $coolingDownPackage)
+            $packages = @($eligiblePackage, $coolingDownPackage, $otherManagerPackage)
             $html = ConvertTo-HtmlPackageReport -Packages $packages -CooldownHours 168
             $outsideCooldownPackages = @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $packages -CooldownHours 168)
 
             $outsideCooldownPackages.Count | Should -Be 1
             $outsideCooldownPackages[0].PackageId | Should -Be 'eligible'
+            $html | Should -Match '(?s)<a href="#package-manager-summary">Package manager summary</a>.*?<h2 id="package-manager-summary">Package manager summary</h2>.*?<th>Manager</th><th>Upgradeable packages</th><th>Outside cooldown</th>.*?<tr><td>scoop&amp;&lt;test&gt;</td><td>1</td><td>0</td></tr>.*?<tr><td>winget</td><td>2</td><td>1</td></tr>.*?<h2 id="packages-by-name">'
             $html | Should -Match '(?s)<h2 id="packages-outside-cooldown">.*?<th>Available upgrade versions</th>.*?</thead><tbody>\s*<tr>.*?Eligible App.*?<td>2\.0</td>.*?</tr>\s*</tbody>'
             $html | Should -Not -Match '(?s)<h2 id="packages-outside-cooldown">.*?Cooling App.*?</tbody>'
         }
