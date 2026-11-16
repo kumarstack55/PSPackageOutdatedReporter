@@ -140,13 +140,26 @@ Describe 'Outdated package report orchestration' {
         }
     }
 
-    It 'rejects an unregistered provider before reading the cache' {
+    It 'rejects an invalid package manager before reading the cache' {
         InModuleScope PSPackageOutdatedReporter {
             Mock Get-ReleaseDateCache {}
 
             {
                 Invoke-OutdatedPackageReport -PackageManager 'Unknown' -CachePath (Join-Path $TestDrive 'cache.json')
-            } | Should -Throw "*Unsupported package manager 'Unknown'*"
+            } | Should -Throw -ErrorId 'ParameterArgumentValidationError,Invoke-OutdatedPackageReport'
+
+            Assert-MockCalled Get-ReleaseDateCache -Times 0 -Exactly
+        }
+    }
+
+    It 'rejects an unregistered provider before reading the cache' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-PackageProvider { $null }
+            Mock Get-ReleaseDateCache {}
+
+            {
+                Invoke-OutdatedPackageReport -PackageManager 'WinGet' -CachePath (Join-Path $TestDrive 'cache.json')
+            } | Should -Throw "*Unsupported package manager 'WinGet'*"
 
             Assert-MockCalled Get-ReleaseDateCache -Times 0 -Exactly
         }

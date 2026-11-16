@@ -28,11 +28,11 @@ Describe 'HTML package report' {
             $html | Should -Match 'winget upgrade &lt;demo&gt;'
             $html | Should -Match 'class="command-line"'
             $html | Should -Match 'class="copy-button" data-command="winget upgrade &lt;demo&gt;"'
-            $html | Should -Match 'background:#1e1e1e;color:#f5f5f5'
-            $html | Should -Match 'gap:\.3rem.*padding:\.2rem \.4rem'
-            $html | Should -Match 'padding:0 \.2rem'
-            $html | Should -Match 'display:inline-flex;vertical-align:middle'
-            $html | Should -Match 'white-space:pre;overflow-wrap:normal;overflow-x:auto'
+            $html | Should -Match '\.command-line\s*\{[^}]*background:\s*#1e1e1e;\s*color:\s*#f5f5f5;'
+            $html | Should -Match '\.command-line\s*\{[^}]*gap:\s*0?\.3rem;[^}]*padding:\s*0?\.2rem\s+0?\.4rem;'
+            $html | Should -Match '\.copy-button\s*\{[^}]*padding:\s*0\s+0?\.2rem;'
+            $html | Should -Match '\.command-line\s*\{[^}]*display:\s*inline-flex;\s*vertical-align:\s*middle;'
+            $html | Should -Match '\.command-line code\s*\{[^}]*white-space:\s*pre;\s*overflow-wrap:\s*normal;\s*overflow-x:\s*auto;'
             $html | Should -Match '&#x1F4CB;'
             $html | Should -Match 'var original="\\uD83D\\uDCCB"'
             $html | Should -Match 'Copied!'
@@ -61,7 +61,9 @@ Describe 'HTML package report' {
             $html = ConvertTo-HtmlPackageReport -Packages @($package) -CooldownHours 168
 
             $html | Should -Match '(?s)<ul class="versions">\s*<li class="installed">.*?<ul>\s*<li><span class="upgrade">2\.0 .*?</span> <span class="cooldown">&#x1F9CA; cooldown'
-            $html | Should -Match '\.installed\{color:red\}\.upgrade\{color:green\}\.cooldown\{color:darkgray\}'
+            $html | Should -Match '\.installed\s*\{\s*color:\s*red;\s*\}'
+            $html | Should -Match '\.upgrade\s*\{\s*color:\s*green;\s*\}'
+            $html | Should -Match '\.cooldown\s*\{\s*color:\s*darkgray;\s*\}'
         }
     }
 
