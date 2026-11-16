@@ -48,6 +48,47 @@ Describe 'dotnet tool provider' {
         }
     }
 
+    It 'marks the upgrade check unsuccessful when NuGet versions cannot be retrieved' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-Command { [pscustomobject]@{ Name = 'dotnet' } }
+            Mock dotnet {
+                $global:LASTEXITCODE = 0
+                '{"version":1,"data":[{"packageId":"demo.tool","version":"1.0.0"}]}'
+            }
+            Mock Invoke-WebRequest { throw 'NuGet unavailable' }
+            Mock Write-Warning {}
+            $count = $null
+            $checkSucceeded = $true
+
+            $result = @(Get-DotNetToolUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 1
+            $checkSucceeded | Should -BeFalse
+            Assert-MockCalled Write-Warning -Times 1 -ParameterFilter { $Message -like '*NuGet unavailable*' }
+        }
+    }
+
+    It 'counts installed tools even when the source filter excludes NuGet' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-Command { [pscustomobject]@{ Name = 'dotnet' } }
+            Mock dotnet {
+                $global:LASTEXITCODE = 0
+                '{"version":1,"data":[{"packageId":"demo.tool","version":"1.0.0"}]}'
+            }
+            Mock Invoke-WebRequest { throw 'NuGet must not be queried' }
+            $count = $null
+            $checkSucceeded = $false
+
+            $result = @(Get-DotNetToolUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -SourceFilter winget -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 1
+            $checkSucceeded | Should -BeTrue
+            Assert-MockCalled Invoke-WebRequest -Times 0
+        }
+    }
+
     It 'marks dotnet tool versions as not published and caches the result' {
         $cache = @{ schemaVersion = 1; entries = @{} }
 

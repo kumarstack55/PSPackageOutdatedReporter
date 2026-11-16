@@ -213,10 +213,12 @@ function Get-ScoopUpgradeablePackages {
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
         [string]$SourceFilter,
-        [ref]$InstalledCount
+        [ref]$InstalledCount,
+        [ref]$UpgradeCheckSucceeded
     )
 
     if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $false }
     if ($null -eq (Get-Command scoop -ErrorAction SilentlyContinue)) {
         Write-Warning 'Scoop is not installed or is not on PATH.'
         return @()
@@ -226,9 +228,15 @@ function Get-ScoopUpgradeablePackages {
         try {
             Write-StageStatus 'Scoop: querying installed packages...'
             Add-InvocationLogEntry -Type ExternalCommand -Detail 'scoop list'
-            $installedApps = @(scoop list 2>$null)
-            if ($LASTEXITCODE -ne 0) {
-                throw "scoop list exited with code $LASTEXITCODE."
+            $listOutput = @(scoop list 2>$null 6>&1)
+            $listExitCode = $LASTEXITCODE
+            $installedApps = @($listOutput | Where-Object { $_ -isnot [System.Management.Automation.InformationRecord] })
+            $emptyNotice = @($listOutput | Where-Object {
+                $_ -is [System.Management.Automation.InformationRecord] -and
+                [string]$_.MessageData -eq "WARN  There aren't any apps installed."
+            })
+            if ($listExitCode -ne 0 -and -not ($listExitCode -eq 1 -and $installedApps.Count -eq 0 -and $emptyNotice.Count -eq 1)) {
+                throw "scoop list exited with code $listExitCode."
             }
             foreach ($app in $installedApps) {
                 if ($null -eq $app.PSObject.Properties['Name'] -or [string]::IsNullOrWhiteSpace([string]$app.Name)) {
@@ -336,6 +344,7 @@ function Get-ScoopUpgradeablePackages {
         $reportPackages.Add([SoftwarePackage]::new('scoop', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $true }
     return $reportPackages.ToArray()
 }
 

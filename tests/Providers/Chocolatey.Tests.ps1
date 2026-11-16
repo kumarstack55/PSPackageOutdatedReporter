@@ -42,6 +42,27 @@ Describe 'Chocolatey provider' {
         }
     }
 
+    It 'counts installed packages even when the source filter excludes Chocolatey' {
+        InModuleScope PSPackageOutdatedReporter {
+            function choco {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'choco' } } -ParameterFilter { $Name -eq 'choco' }
+            Mock choco {
+                $global:LASTEXITCODE = 0
+                if ($args[0] -eq 'list') { 'one|1.0'; 'two|2.0' }
+                else { throw 'choco outdated must not be queried' }
+            }
+            $count = $null
+            $checkSucceeded = $false
+
+            $result = @(Get-ChocolateyUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -SourceFilter winget -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 2
+            $checkSucceeded | Should -BeTrue
+            Assert-MockCalled choco -Times 1 -Exactly
+        }
+    }
+
     It 'builds upgrade commands with escaped arguments' {
         New-ChocolateyUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
             Should -Be "choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"

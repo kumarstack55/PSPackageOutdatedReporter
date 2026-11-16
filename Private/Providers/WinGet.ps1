@@ -138,10 +138,12 @@ function Get-WinGetUpgradeablePackages {
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
         [string]$SourceFilter,
-        [ref]$InstalledCount
+        [ref]$InstalledCount,
+        [ref]$UpgradeCheckSucceeded
     )
 
     if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $false }
     $module = Get-Module -ListAvailable Microsoft.WinGet.Client | Sort-Object Version -Descending | Select-Object -First 1
     if ($null -eq $module) {
         Write-Warning 'Microsoft.WinGet.Client is not installed. Run: Install-Module Microsoft.WinGet.Client -Scope CurrentUser'
@@ -164,6 +166,7 @@ function Get-WinGetUpgradeablePackages {
     Write-StageStatus "WinGet: found $($updatablePackages.Count) package(s) with updates available."
 
     $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $allUpdatesResolved = $true
     $packageIndex = 0
     foreach ($installedPackage in $updatablePackages) {
         $packageIndex++
@@ -176,6 +179,7 @@ function Get-WinGetUpgradeablePackages {
         $versions = @($installedPackage.AvailableVersions | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First $MaxUpgradeVersions)
         if ($versions.Count -eq 0) {
             Write-Warning "WinGet reported an update for '$($installedPackage.Id)' but supplied no available version."
+            $allUpdatesResolved = $false
             continue
         }
 
@@ -193,6 +197,7 @@ function Get-WinGetUpgradeablePackages {
         $reportPackages.Add([SoftwarePackage]::new('winget', $installedPackage.Id, $installedPackage.Name, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $allUpdatesResolved }
     return $reportPackages.ToArray()
 }
 

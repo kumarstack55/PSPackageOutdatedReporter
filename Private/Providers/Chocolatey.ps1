@@ -139,20 +139,18 @@ function Get-ChocolateyUpgradeablePackages {
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
         [string]$SourceFilter,
-        [ref]$InstalledCount
+        [ref]$InstalledCount,
+        [ref]$UpgradeCheckSucceeded
     )
 
     if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $false }
     if ($null -eq (Get-Command choco -ErrorAction SilentlyContinue)) {
         Write-Warning 'Chocolatey is not installed or is not on PATH.'
         return @()
     }
 
     $candidateSource = 'chocolatey'
-    if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
-        return @()
-    }
-
     if ($null -ne $InstalledCount) {
         try {
             Write-StageStatus 'Chocolatey: querying installed packages...'
@@ -170,6 +168,11 @@ function Get-ChocolateyUpgradeablePackages {
         } catch {
             Write-Warning "Unable to count installed Chocolatey packages: $($_.Exception.Message)"
         }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
+        if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $true }
+        return @()
     }
 
     try {
@@ -219,6 +222,7 @@ function Get-ChocolateyUpgradeablePackages {
         $reportPackages.Add([SoftwarePackage]::new('chocolatey', $packageId, $packageId, $candidateSource, $null, $installedVersion, $latestVersion, $targets.ToArray(), $infoUrl))
     }
 
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $true }
     return $reportPackages.ToArray()
 }
 

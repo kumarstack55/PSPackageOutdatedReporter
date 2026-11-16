@@ -39,7 +39,8 @@ function ConvertTo-HtmlPackageReport {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = $script:DefaultCooldownHours,
-        [hashtable]$InstalledCounts = @{}
+        [hashtable]$InstalledCounts = @{},
+        [hashtable]$UpgradeCheckResults = @{}
     )
 
     $entries = @()
@@ -185,20 +186,28 @@ function ConvertTo-HtmlPackageReport {
         $null = $builder.AppendLine('</nav>')
     }
 
+    $summaries = @(Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -UpgradeCheckResults $UpgradeCheckResults -CooldownHours $CooldownHours)
+    if ($summaries.Count -gt 0) {
+        $null = $builder.AppendLine('<h2 id="package-manager-summary">Package manager summary</h2>')
+        $null = $builder.AppendLine('<table><thead><tr><th>Manager</th><th>Installed packages</th><th>Upgradeable packages</th><th>Outside cooldown</th></tr></thead><tbody>')
+        foreach ($summary in $summaries) {
+            $manager = ConvertTo-HtmlReportText -Value $summary.Manager
+            $installed = ConvertTo-HtmlReportText -Value ([string]$summary.InstalledPackages)
+            $null = $builder.AppendLine("<tr><td>$manager</td><td>$installed</td><td>$($summary.UpgradeablePackages)</td><td>$($summary.OutsideCooldown)</td></tr>")
+        }
+        $null = $builder.AppendLine('</tbody></table>')
+    }
+
     if ($Packages.Count -eq 0) {
-        $null = $builder.AppendLine('<p>No upgradeable packages found.</p>')
+        if ($UpgradeCheckResults.Values -contains $false) {
+            $null = $builder.AppendLine('<p>No upgradeable packages reported; some package managers could not be checked.</p>')
+        }
+        else {
+            $null = $builder.AppendLine('<p>No upgradeable packages found.</p>')
+        }
         $null = $builder.AppendLine('</body></html>')
         return $builder.ToString()
     }
-
-    $null = $builder.AppendLine('<h2 id="package-manager-summary">Package manager summary</h2>')
-    $null = $builder.AppendLine('<table><thead><tr><th>Manager</th><th>Installed packages</th><th>Upgradeable packages</th><th>Outside cooldown</th></tr></thead><tbody>')
-    foreach ($summary in (Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours)) {
-        $manager = ConvertTo-HtmlReportText -Value $summary.Manager
-        $installed = ConvertTo-HtmlReportText -Value ([string]$summary.InstalledPackages)
-        $null = $builder.AppendLine("<tr><td>$manager</td><td>$installed</td><td>$($summary.UpgradeablePackages)</td><td>$($summary.OutsideCooldown)</td></tr>")
-    }
-    $null = $builder.AppendLine('</tbody></table>')
 
     $columnHeaders = @(
         'Manager',
@@ -338,7 +347,8 @@ function Write-HtmlPackageReport {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = $script:DefaultCooldownHours,
-        [hashtable]$InstalledCounts = @{}
+        [hashtable]$InstalledCounts = @{},
+        [hashtable]$UpgradeCheckResults = @{}
     )
 
     $reportPath = Get-HtmlReportPath
@@ -347,7 +357,7 @@ function Write-HtmlPackageReport {
 
     $temporaryPath = Join-Path $reportDirectory ([IO.Path]::GetRandomFileName())
     try {
-        $html = ConvertTo-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
+        $html = ConvertTo-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -UpgradeCheckResults $UpgradeCheckResults -CooldownHours $CooldownHours
         $encoding = [System.Text.UTF8Encoding]::new($false)
         [IO.File]::WriteAllText($temporaryPath, $html, $encoding)
         Move-Item -LiteralPath $temporaryPath -Destination $reportPath -Force -ErrorAction Stop

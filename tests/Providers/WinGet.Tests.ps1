@@ -21,6 +21,25 @@ Describe 'WinGet provider' {
         }
     }
 
+    It 'marks the upgrade check incomplete when an update has no available version' {
+        InModuleScope PSPackageOutdatedReporter {
+            function Get-WinGetPackage { [CmdletBinding()] param() }
+            Mock Get-Module { [pscustomobject]@{ Path = 'mock-module'; Version = [version]'1.0' } } -ParameterFilter { $ListAvailable }
+            Mock Import-Module {}
+            Mock Get-WinGetPackage { [pscustomobject]@{ Id = 'demo'; IsUpdateAvailable = $true; Source = 'winget'; AvailableVersions = @() } }
+            Mock Write-Warning {}
+            $count = $null
+            $checkSucceeded = $true
+
+            $result = @(Get-WinGetUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 1
+            $checkSucceeded | Should -BeFalse
+            Assert-MockCalled Write-Warning -Times 1 -ParameterFilter { $Message -like '*no available version*' }
+        }
+    }
+
     It 'builds a WinGet manifest URL' {
         Get-WinGetManifestUrl -PackageId 'Contoso.App' -Version '1.2.3' |
             Should -Be 'https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/c/Contoso/App/1.2.3/Contoso.App.yaml'

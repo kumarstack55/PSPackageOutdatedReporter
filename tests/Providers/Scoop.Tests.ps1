@@ -14,11 +14,61 @@ Describe 'Scoop provider' {
                 }
             }
             $count = $null
+            $checkSucceeded = $false
 
-            $result = @(Get-ScoopUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count))
+            $result = @(Get-ScoopUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded))
 
             $result.Count | Should -Be 0
             $count | Should -Be 2
+            $checkSucceeded | Should -BeTrue
+        }
+    }
+
+    It 'reports an unsuccessful upgrade check separately from the installed count' {
+        InModuleScope PSPackageOutdatedReporter {
+            function scoop {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'scoop' } } -ParameterFilter { $Name -eq 'scoop' }
+            Mock scoop {
+                if ($args[0] -eq 'list') {
+                    $global:LASTEXITCODE = 0
+                    [pscustomobject]@{ Name = 'one' }
+                }
+                else {
+                    $global:LASTEXITCODE = 1
+                }
+            }
+            Mock Write-Warning {}
+            $count = $null
+            $checkSucceeded = $true
+
+            Get-ScoopUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded)
+
+            $count | Should -Be 1
+            $checkSucceeded | Should -BeFalse
+            Assert-MockCalled Write-Warning -Times 1 -ParameterFilter { $Message -like '*query Scoop packages*' }
+        }
+    }
+
+    It 'counts zero when Scoop reports that no apps are installed' {
+        InModuleScope PSPackageOutdatedReporter {
+            function scoop {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'scoop' } } -ParameterFilter { $Name -eq 'scoop' }
+            Mock scoop {
+                if ($args[0] -eq 'list') {
+                    $global:LASTEXITCODE = 1
+                    Write-Host "WARN  There aren't any apps installed."
+                }
+                else {
+                    $global:LASTEXITCODE = 0
+                }
+            }
+            $count = $null
+            $checkSucceeded = $false
+
+            Get-ScoopUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count) -UpgradeCheckSucceeded ([ref]$checkSucceeded)
+
+            $count | Should -Be 0
+            $checkSucceeded | Should -BeTrue
         }
     }
 

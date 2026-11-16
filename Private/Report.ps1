@@ -58,15 +58,19 @@ function Get-ReportPackageManagerSummary {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = $script:DefaultCooldownHours,
-        [hashtable]$InstalledCounts = @{}
+        [hashtable]$InstalledCounts = @{},
+        [hashtable]$UpgradeCheckResults = @{}
     )
 
-    foreach ($group in ($Packages | Group-Object -Property PackageManagerId | Sort-Object Name)) {
+    $managers = @(@($InstalledCounts.Keys) + @($Packages | ForEach-Object { $_.PackageManagerId }) | Sort-Object -Unique)
+    foreach ($manager in $managers) {
+        $managerPackages = @($Packages | Where-Object { $_.PackageManagerId -eq $manager })
+        $upgradeCheckFailed = $UpgradeCheckResults.ContainsKey($manager) -and -not $UpgradeCheckResults[$manager]
         [pscustomobject]@{
-            Manager = $group.Name
-            InstalledPackages = if ($null -ne $InstalledCounts[$group.Name]) { $InstalledCounts[$group.Name] } else { 'Unknown' }
-            UpgradeablePackages = $group.Count
-            OutsideCooldown = @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $group.Group -CooldownHours $CooldownHours).Count
+            Manager = $manager
+            InstalledPackages = if ($null -ne $InstalledCounts[$manager]) { $InstalledCounts[$manager] } else { 'Unknown' }
+            UpgradeablePackages = if ($upgradeCheckFailed) { 'Unknown' } else { $managerPackages.Count }
+            OutsideCooldown = if ($upgradeCheckFailed) { 'Unknown' } else { @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $managerPackages -CooldownHours $CooldownHours).Count }
         }
     }
 }
@@ -78,7 +82,8 @@ function Write-OutdatedPackageReport {
         [int]$CooldownHours = $script:DefaultCooldownHours,
         [ValidateSet('Console', 'Html')][string]$OutputFormat = 'Console',
         [switch]$OpenReport,
-        [hashtable]$InstalledCounts = @{}
+        [hashtable]$InstalledCounts = @{},
+        [hashtable]$UpgradeCheckResults = @{}
     )
 
     if ($OpenReport -and $OutputFormat -ne 'Html') {
@@ -86,7 +91,7 @@ function Write-OutdatedPackageReport {
     }
 
     if ($OutputFormat -eq 'Html') {
-        $reportPath = Write-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
+        $reportPath = Write-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -UpgradeCheckResults $UpgradeCheckResults -CooldownHours $CooldownHours
         Write-Host "HTML report saved to: $reportPath"
         if ($OpenReport) {
             Start-Process -FilePath $reportPath -ErrorAction Stop
@@ -94,7 +99,7 @@ function Write-OutdatedPackageReport {
         return
     }
 
-    Write-ConsolePackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
+    Write-ConsolePackageReport -Packages $Packages -InstalledCounts $InstalledCounts -UpgradeCheckResults $UpgradeCheckResults -CooldownHours $CooldownHours
 }
 
 function Write-ConsolePackageReport {
@@ -102,11 +107,26 @@ function Write-ConsolePackageReport {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = $script:DefaultCooldownHours,
-        [hashtable]$InstalledCounts = @{}
+        [hashtable]$InstalledCounts = @{},
+        [hashtable]$UpgradeCheckResults = @{}
     )
 
+    $summaries = @(Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -UpgradeCheckResults $UpgradeCheckResults -CooldownHours $CooldownHours)
+    if ($summaries.Count -gt 0) {
+        Write-Host '## Package manager summary'
+        $summaries |
+            Format-Table -AutoSize |
+            Out-String -Width 4096 |
+            Out-Host
+    }
+
     if ($Packages.Count -eq 0) {
-        Write-Host -ForegroundColor Green 'No upgradeable packages found.'
+        if ($UpgradeCheckResults.Values -contains $false) {
+            Write-Host 'No upgradeable packages reported; some package managers could not be checked.'
+        }
+        else {
+            Write-Host -ForegroundColor Green 'No upgradeable packages found.'
+        }
         return
     }
 
@@ -119,12 +139,6 @@ function Write-ConsolePackageReport {
         @{ Name = 'LatestVersionReleaseDate'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetDateOnlyDisplay() } },
         @{ Name = 'LatestVersionReleaseRelative'; Expression = { $_.LatestVersion.GetEffectiveDateInfo().GetRelativeDisplayWithFallbackLabel() } }
     $reportColumnNames = 'Manager', 'Name', 'InstalledVersion', 'InstalledVersionReleaseDate', 'InstalledVersionReleaseRelative', 'LatestVersion', 'LatestVersionReleaseDate', 'LatestVersionReleaseRelative'
-
-    Write-Host '## Package manager summary'
-    Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours |
-        Format-Table -AutoSize |
-        Out-String -Width 4096 |
-        Out-Host
 
     Write-Host '## Upgradeable packages (sorted by software name)'
     $Packages |

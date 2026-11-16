@@ -1,9 +1,11 @@
 ﻿function Get-DotNetToolPackageVersions {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][string]$PackageId
+        [Parameter(Mandatory)][string]$PackageId,
+        [ref]$QuerySucceeded
     )
 
+    if ($null -ne $QuerySucceeded) { $QuerySucceeded.Value = $false }
     $packageIdPath = [uri]::EscapeDataString($PackageId.ToLowerInvariant())
     $uri = "https://api.nuget.org/v3-flatcontainer/$packageIdPath/index.json"
     try {
@@ -13,9 +15,13 @@
             Invoke-WebRequest -Uri $uri -TimeoutSec 15 -ErrorAction Stop -UseBasicParsing
         }
         $data = $response.Content | ConvertFrom-Json -ErrorAction Stop
+        if ($null -eq $data -or $null -eq $data.PSObject.Properties['versions'] -or $null -eq $data.versions) {
+            throw 'NuGet returned an invalid versions response.'
+        }
+        if ($null -ne $QuerySucceeded) { $QuerySucceeded.Value = $true }
         return @($data.versions | Where-Object { $_ -match '^[0-9]+(\.[0-9]+){0,3}$' })
     } catch {
-        Write-Verbose "Failed to retrieve NuGet versions for ${PackageId}: $($_.Exception.Message)"
+        Write-Warning "Failed to retrieve NuGet versions for ${PackageId}: $($_.Exception.Message)"
         return @()
     }
 }
@@ -51,12 +57,15 @@ function Get-DotNetToolUpgradeablePackages {
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
         [string]$SourceFilter,
-        [ref]$InstalledCount
+        [ref]$InstalledCount,
+        [ref]$UpgradeCheckSucceeded
     )
 
     if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $false }
     $candidateSource = 'nuget.org'
-    if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
+    if ($null -eq $InstalledCount -and -not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
+        if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $true }
         return @()
     }
 
@@ -83,17 +92,27 @@ function Get-DotNetToolUpgradeablePackages {
         return @()
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
+        if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $true }
+        return @()
+    }
+
     $reportPackages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $allQueriesSucceeded = $true
     $packageIndex = 0
     foreach ($installedTool in $installedTools) {
         $packageIndex++
         $packageId = [string]$installedTool.packageId
         $installedVersionText = [string]$installedTool.version
         if ([string]::IsNullOrWhiteSpace($packageId) -or [string]::IsNullOrWhiteSpace($installedVersionText)) {
+            Write-Warning 'dotnet tool list returned an entry without a package ID or version.'
+            $allQueriesSucceeded = $false
             continue
         }
 
-        $versions = @(Get-DotNetToolPackageVersions -PackageId $packageId)
+        $querySucceeded = $false
+        $versions = @(Get-DotNetToolPackageVersions -PackageId $packageId -QuerySucceeded ([ref]$querySucceeded))
+        if (-not $querySucceeded) { $allQueriesSucceeded = $false }
         $versionTexts = @($versions |
                 Sort-Object -Property @{ Expression = { Get-NormalizedPackageVersion -Version $_ } } -Descending |
                 Select-Object -First $MaxUpgradeVersions)
@@ -126,7 +145,8 @@ function Get-DotNetToolUpgradeablePackages {
     }
 
     Write-StageStatus "dotnet tool: found $($reportPackages.Count) upgradeable package(s)."
+    if ($null -ne $UpgradeCheckSucceeded) { $UpgradeCheckSucceeded.Value = $allQueriesSucceeded }
     return $reportPackages.ToArray()
 }
 
-Register-PackageProvider -Id 'DotNetTool' -DisplayName 'dotnet tool' -CollectorCommand 'Get-DotNetToolUpgradeablePackages'
+Register-PackageProvider -Id 'DotNetTool' -DisplayName 'dotnet tool' -CollectorCommand 'Get-DotNetToolUpgradeablePackages' -PackageManagerId 'dotnet-tool'

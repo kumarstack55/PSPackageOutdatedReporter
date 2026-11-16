@@ -62,6 +62,39 @@ Describe 'Package manager summary' {
             }
         }
     }
+
+    It 'includes managers without upgrades and distinguishes failed checks' {
+        InModuleScope PSPackageOutdatedReporter {
+            $summary = @(Get-ReportPackageManagerSummary -Packages @() -InstalledCounts @{ scoop = 14; winget = $null; chocolatey = 5 } -UpgradeCheckResults @{ scoop = $true; winget = $false; chocolatey = $false })
+
+            $summary.Count | Should -Be 3
+            $summary[0].Manager | Should -Be 'chocolatey'
+            $summary[0].InstalledPackages | Should -Be 5
+            $summary[0].UpgradeablePackages | Should -Be 'Unknown'
+            $summary[0].OutsideCooldown | Should -Be 'Unknown'
+            $summary[1].Manager | Should -Be 'scoop'
+            $summary[1].InstalledPackages | Should -Be 14
+            $summary[1].UpgradeablePackages | Should -Be 0
+            $summary[1].OutsideCooldown | Should -Be 0
+            $summary[2].InstalledPackages | Should -Be 'Unknown'
+            $summary[2].UpgradeablePackages | Should -Be 'Unknown'
+        }
+    }
+
+    It 'writes a console summary even when there are no upgrades' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-ReportPackageManagerSummary {
+                [pscustomobject]@{ Manager = 'scoop'; InstalledPackages = 14; UpgradeablePackages = 0; OutsideCooldown = 0 }
+            }
+
+            $output = (Write-ConsolePackageReport -Packages @() -InstalledCounts @{ scoop = 14 } -UpgradeCheckResults @{ scoop = $true } 6>&1 | Out-String)
+
+            $output | Should -Match '(?s)## Package manager summary.*No upgradeable packages found\.'
+            Assert-MockCalled Get-ReportPackageManagerSummary -Times 1 -Exactly -ParameterFilter {
+                $Packages.Count -eq 0 -and $InstalledCounts.scoop -eq 14 -and $UpgradeCheckResults.scoop
+            }
+        }
+    }
 }
 
 Describe 'Outdated package report orchestration' {
@@ -122,6 +155,7 @@ Describe 'Outdated package report orchestration' {
             Mock Write-OutdatedPackageReport {}
             Mock Get-WinGetUpgradeablePackages {
                 $InstalledCount.Value = 12
+                $UpgradeCheckSucceeded.Value = $true
                 $installed = [PackageVersion]::new('1.0', $null, 'NotPublished', 'test')
                 $latest = [PackageVersion]::new('2.0', $null, 'NotPublished', 'test')
                 [SoftwarePackage]::new('winget', 'demo', 'Demo', 'winget', $null, $installed, $latest, @([UpgradeTarget]::new($latest, 'upgrade demo')), $null)
@@ -130,8 +164,56 @@ Describe 'Outdated package report orchestration' {
             Invoke-OutdatedPackageReport -PackageManager WinGet -CachePath (Join-Path $TestDrive 'cache.json')
 
             Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
-                $Packages.Count -eq 1 -and $InstalledCounts.winget -eq 12
+                $Packages.Count -eq 1 -and $InstalledCounts.winget -eq 12 -and $UpgradeCheckResults.winget
             }
+        }
+    }
+
+    It 'forwards counts and check results when a manager has no upgrades' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-ReleaseDateCache { @{ schemaVersion = 1; entries = @{} } }
+            Mock Save-ReleaseDateCache {}
+            Mock Write-StageStatus {}
+            Mock Write-OutdatedPackageReport {}
+            Mock Get-ScoopUpgradeablePackages {
+                $InstalledCount.Value = 14
+                $UpgradeCheckSucceeded.Value = $true
+            }
+            Mock Get-DotNetToolUpgradeablePackages {
+                $InstalledCount.Value = 3
+                $UpgradeCheckSucceeded.Value = $false
+            }
+
+            Invoke-OutdatedPackageReport -PackageManager Scoop, DotNetTool -CachePath (Join-Path $TestDrive 'cache.json')
+
+            Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
+                $Packages.Count -eq 0 -and $InstalledCounts.scoop -eq 14 -and $UpgradeCheckResults.scoop -and
+                $InstalledCounts['dotnet-tool'] -eq 3 -and -not $UpgradeCheckResults['dotnet-tool']
+            }
+        }
+    }
+
+    It 'writes a Scoop summary through the full HTML report path when no updates are available' {
+        InModuleScope PSPackageOutdatedReporter {
+            function scoop {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'scoop' } } -ParameterFilter { $Name -eq 'scoop' }
+            Mock scoop {
+                $global:LASTEXITCODE = 0
+                if ($args[0] -eq 'list') {
+                    [pscustomobject]@{ Name = 'one' }
+                    [pscustomobject]@{ Name = 'two' }
+                }
+            }
+            Mock Get-ReleaseDateCache { @{ schemaVersion = 1; entries = @{} } }
+            Mock Save-ReleaseDateCache {}
+            Mock Write-StageStatus {}
+            Mock Get-HtmlReportPath { Join-Path $TestDrive 'summary.html' }
+
+            Invoke-OutdatedPackageReport -PackageManager Scoop -OutputFormat Html -CachePath (Join-Path $TestDrive 'cache.json')
+            $html = Get-Content -LiteralPath (Join-Path $TestDrive 'summary.html') -Raw
+
+            $html | Should -Match '<tr><td>scoop</td><td>2</td><td>0</td><td>0</td></tr>'
+            $html | Should -Match 'No upgradeable packages found\.'
         }
     }
 

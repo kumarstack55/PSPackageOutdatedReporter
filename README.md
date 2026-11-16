@@ -105,7 +105,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ".\In
 
 `-OutputFormat` defaults to `Console`. Use `-OutputFormat Html` to write a single report to `Documents\PSPackageOutdatedReporter\Reports\report.html`; the report is overwritten on each run. Progress remains in the console. Add `-OpenReport` to open the generated HTML report in the default browser. `-OpenReport` requires `-OutputFormat Html`.
 
-The report starts with a summary by package manager of installed packages, upgradeable packages, and those with at least one upgrade target outside cooldown. It includes only managers with reported upgradeable packages. Installed counts cover the entire manager (global tools for dotnet tool), regardless of `-Source`; source and version limits apply to the upgrade counts as they do to the detailed report. An unavailable installed count is shown as `Unknown`.
+The report starts with a summary for each selected package manager of installed packages, upgradeable packages, and those with at least one upgrade target outside cooldown, including managers with no upgrades. Installed counts cover the entire manager (global tools for dotnet tool), regardless of `-Source`; source and version limits apply to the upgrade counts as they do to the detailed report. Counts that could not be determined are shown as `Unknown`.
 
 ## Tests
 
@@ -113,7 +113,7 @@ The internal functions are exposed through `PSPackageOutdatedReporter.psm1`. Imp
 
 Core behavior is covered by `tests/Core.Tests.ps1`. Provider behavior is covered by `tests/Providers/WinGet.Tests.ps1`, `tests/Providers/Chocolatey.Tests.ps1`, and `tests/Providers/Scoop.Tests.ps1`.
 
-Providers register their collector when the module loads. A new provider must implement a collector accepting `Cache`, `CacheTtlHours`, `MaxUpgradeVersions`, `SourceFilter`, and an optional `InstalledCount` reference, return `SoftwarePackage[]`, and register its ID, display name, and collector command with `Register-PackageProvider`. The collector sets the reference to the total installed count, or leaves it null and warns if the count cannot be obtained.
+Providers register their collector when the module loads. A new provider must implement a collector accepting `Cache`, `CacheTtlHours`, `MaxUpgradeVersions`, `SourceFilter`, and optional `InstalledCount` and `UpgradeCheckSucceeded` references, return `SoftwarePackage[]`, and register its ID, display name, report package-manager ID, and collector command with `Register-PackageProvider`. The collector sets the installed count or leaves it null and warns if unavailable. It sets `UpgradeCheckSucceeded` to true only when the upgrade check succeeds.
 
 Install Pester 5 if needed, then run the tests from Windows PowerShell 5.1:
 

@@ -4,7 +4,8 @@ function Register-PackageProvider {
     param(
         [Parameter(Mandatory)][string]$Id,
         [Parameter(Mandatory)][string]$DisplayName,
-        [Parameter(Mandatory)][string]$CollectorCommand
+        [Parameter(Mandatory)][string]$CollectorCommand,
+        [string]$PackageManagerId = $Id.ToLowerInvariant()
     )
 
     if ($script:ProviderRegistry.Contains($Id)) {
@@ -18,6 +19,7 @@ function Register-PackageProvider {
             Id = $Id
             DisplayName = $DisplayName
             CollectorCommand = $CollectorCommand
+            PackageManagerId = $PackageManagerId
         })
 }
 

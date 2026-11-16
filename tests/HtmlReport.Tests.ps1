@@ -51,6 +51,24 @@ Describe 'HTML package report' {
         }
     }
 
+    It 'shows installed counts and zero upgrades when there are no upgradeable packages' {
+        InModuleScope PSPackageOutdatedReporter {
+            $html = ConvertTo-HtmlPackageReport -Packages @() -InstalledCounts @{ scoop = 14; winget = 0 } -UpgradeCheckResults @{ scoop = $true; winget = $true }
+
+            $html | Should -Match '(?s)<h2 id="package-manager-summary">.*?<tr><td>scoop</td><td>14</td><td>0</td><td>0</td></tr>.*?<tr><td>winget</td><td>0</td><td>0</td><td>0</td></tr>.*?No upgradeable packages found\.'
+        }
+    }
+
+    It 'shows unknown instead of zero when the upgrade check fails' {
+        InModuleScope PSPackageOutdatedReporter {
+            $html = ConvertTo-HtmlPackageReport -Packages @() -InstalledCounts @{ scoop = 14 } -UpgradeCheckResults @{ scoop = $false }
+
+            $html | Should -Match '<tr><td>scoop</td><td>14</td><td>Unknown</td><td>Unknown</td></tr>'
+            $html | Should -Match 'some package managers could not be checked'
+            $html | Should -Not -Match 'No upgradeable packages found\.'
+        }
+    }
+
     It 'renders upgrade targets as nested bullets and shows the cooldown icon' {
         InModuleScope PSPackageOutdatedReporter {
             $installed = [PackageVersion]::new('1.0', $null, 'NotPublished', 'test')
@@ -80,12 +98,12 @@ Describe 'HTML package report' {
             $otherManagerPackage = [SoftwarePackage]::new('scoop&<test>', 'other', 'Other App', 'main', $null, $installed, $coolingDown, @([UpgradeTarget]::new($coolingDown, 'scoop update other')), $null)
 
             $packages = @($eligiblePackage, $coolingDownPackage, $otherManagerPackage)
-            $html = ConvertTo-HtmlPackageReport -Packages $packages -InstalledCounts @{ 'scoop&<test>' = 0; winget = 9 } -CooldownHours 168
+            $html = ConvertTo-HtmlPackageReport -Packages $packages -InstalledCounts @{ chocolatey = 7; 'scoop&<test>' = 0; winget = 9 } -UpgradeCheckResults @{ chocolatey = $true } -CooldownHours 168
             $outsideCooldownPackages = @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $packages -CooldownHours 168)
 
             $outsideCooldownPackages.Count | Should -Be 1
             $outsideCooldownPackages[0].PackageId | Should -Be 'eligible'
-            $html | Should -Match '(?s)<a href="#package-manager-summary">Package manager summary</a>.*?<h2 id="package-manager-summary">Package manager summary</h2>.*?<th>Manager</th><th>Installed packages</th><th>Upgradeable packages</th><th>Outside cooldown</th>.*?<tr><td>scoop&amp;&lt;test&gt;</td><td>0</td><td>1</td><td>0</td></tr>.*?<tr><td>winget</td><td>9</td><td>2</td><td>1</td></tr>.*?<h2 id="packages-by-name">'
+            $html | Should -Match '(?s)<a href="#package-manager-summary">Package manager summary</a>.*?<h2 id="package-manager-summary">Package manager summary</h2>.*?<th>Manager</th><th>Installed packages</th><th>Upgradeable packages</th><th>Outside cooldown</th>.*?<tr><td>chocolatey</td><td>7</td><td>0</td><td>0</td></tr>.*?<tr><td>scoop&amp;&lt;test&gt;</td><td>0</td><td>1</td><td>0</td></tr>.*?<tr><td>winget</td><td>9</td><td>2</td><td>1</td></tr>.*?<h2 id="packages-by-name">'
             $html | Should -Match '(?s)<h2 id="packages-outside-cooldown">.*?<th>Available upgrade versions</th>.*?</thead><tbody>\s*<tr>.*?Eligible App.*?<td>2\.0</td>.*?</tr>\s*</tbody>'
             $html | Should -Not -Match '(?s)<h2 id="packages-outside-cooldown">.*?Cooling App.*?</tbody>'
         }
