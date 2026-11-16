@@ -1,4 +1,4 @@
-$modulePath = Join-Path $PSScriptRoot '..\PSPackageOutdatedReporter.psm1'
+﻿$modulePath = Join-Path $PSScriptRoot '..\PSPackageOutdatedReporter.psm1'
 Import-Module $modulePath -Force
 
 Describe 'Package provider registry' {

@@ -39,6 +39,7 @@ Clone the repository and create a shortcut in the current user's Startup folder.
 Run the following in Windows PowerShell 5.1. Replace the repository URL if your repository is hosted elsewhere.
 
 ```powershell
+<<<<<<< HEAD
 $repositoryBaseDirectory = $HOME
 
 git clone https://github.com/kumarstack55/PSPackageOutdatedReporter.git "${repositoryBaseDirectory}\PSPackageOutdatedReporter"
@@ -52,12 +53,27 @@ $scriptPath = Join-Path $repositoryPath 'Invoke-ReportPackageOutdated.ps1'
 
 $powershellCommand = Get-Command powershell.exe
 $powershellPath = $powershellCommand.Source
+=======
+$repoPath = Join-Path $HOME 'PSPackageOutdatedReporter'
+git clone https://github.com/kumarstack55/PSPackageOutdatedReporter.git $repoPath
+Set-Location $repoPath
+
+$startupPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
+$shortcutPath = Join-Path $startupPath 'PSPackageOutdatedReporter.lnk'
+$scriptPath = Join-Path $repoPath 'Invoke-ReportPackageOutdated.ps1'
+$powershellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+>>>>>>> refs/remotes/origin/main
 
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $powershellPath
+<<<<<<< HEAD
 $shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "& ''{0}'' -OutputFormat Html -OpenReport; Read-Host ''Press Enter to close''"' -f $scriptPath
 $shortcut.WorkingDirectory = $repositoryPath
+=======
+$shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "& ''{0}''; Read-Host ''Press Enter to close''"' -f $scriptPath
+$shortcut.WorkingDirectory = $repoPath
+>>>>>>> refs/remotes/origin/main
 $shortcut.Description = 'Report outdated packages'
 $shortcut.Save()
 ```

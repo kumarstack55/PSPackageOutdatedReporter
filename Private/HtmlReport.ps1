@@ -1,4 +1,4 @@
-function ConvertTo-HtmlReportText {
+﻿function ConvertTo-HtmlReportText {
     param([AllowNull()][string]$Value)
 
     if ($null -eq $Value) {
@@ -229,7 +229,7 @@ function ConvertTo-HtmlPackageReport {
             }
 
             $null = $builder.AppendLine("<h2 id=`"$($tableSection.Anchor)`">$(ConvertTo-HtmlReportText $tableSection.Title)</h2>")
-            
+
             if ($tableEntries.Count -gt 0) {
                 $null = $builder.AppendLine('<table><thead><tr>')
                 foreach ($columnHeader in $sectionColumnHeaders) {
