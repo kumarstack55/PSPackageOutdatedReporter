@@ -212,12 +212,33 @@ function Get-ScoopUpgradeablePackages {
         [Parameter(Mandatory)][hashtable]$Cache,
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
-        [string]$SourceFilter
+        [string]$SourceFilter,
+        [ref]$InstalledCount
     )
 
+    if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
     if ($null -eq (Get-Command scoop -ErrorAction SilentlyContinue)) {
         Write-Warning 'Scoop is not installed or is not on PATH.'
         return @()
+    }
+
+    if ($null -ne $InstalledCount) {
+        try {
+            Write-StageStatus 'Scoop: querying installed packages...'
+            Add-InvocationLogEntry -Type ExternalCommand -Detail 'scoop list'
+            $installedApps = @(scoop list 2>$null)
+            if ($LASTEXITCODE -ne 0) {
+                throw "scoop list exited with code $LASTEXITCODE."
+            }
+            foreach ($app in $installedApps) {
+                if ($null -eq $app.PSObject.Properties['Name'] -or [string]::IsNullOrWhiteSpace([string]$app.Name)) {
+                    throw 'scoop list returned an unexpected record.'
+                }
+            }
+            $InstalledCount.Value = $installedApps.Count
+        } catch {
+            Write-Warning "Unable to count installed Scoop packages: $($_.Exception.Message)"
+        }
     }
 
     try {

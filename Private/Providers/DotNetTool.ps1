@@ -50,9 +50,11 @@ function Get-DotNetToolUpgradeablePackages {
         [Parameter(Mandatory)][hashtable]$Cache,
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
-        [string]$SourceFilter
+        [string]$SourceFilter,
+        [ref]$InstalledCount
     )
 
+    if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
     $candidateSource = 'nuget.org'
     if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
         return @()
@@ -70,7 +72,12 @@ function Get-DotNetToolUpgradeablePackages {
         if ($LASTEXITCODE -ne 0) {
             throw "dotnet tool list exited with code $LASTEXITCODE."
         }
-        $installedTools = @((($jsonLines -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop).data)
+        $response = ($jsonLines -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
+        if ($null -eq $response -or $null -eq $response.PSObject.Properties['data'] -or $null -eq $response.data) {
+            throw 'dotnet tool list returned an invalid response.'
+        }
+        $installedTools = @($response.data | ForEach-Object { $_ })
+        if ($null -ne $InstalledCount) { $InstalledCount.Value = $installedTools.Count }
     } catch {
         Write-Warning "Unable to query globally installed dotnet tools: $($_.Exception.Message)"
         return @()

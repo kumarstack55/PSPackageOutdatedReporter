@@ -29,16 +29,19 @@ Describe 'Package manager summary' {
                 [SoftwarePackage]::new('scoop', 'c', 'C', 'main', $null, $installed, $recent, @([UpgradeTarget]::new($recent, 'c')), $null)
             )
 
-            $summary = @(Get-ReportPackageManagerSummary -Packages $packages -CooldownHours 168)
+            $summary = @(Get-ReportPackageManagerSummary -Packages $packages -InstalledCounts @{ scoop = 0; winget = 9 } -CooldownHours 168)
 
             $summary.Count | Should -Be 2
             $summary[0].Manager | Should -Be 'scoop'
+            $summary[0].InstalledPackages | Should -Be 0
             $summary[0].UpgradeablePackages | Should -Be 1
             $summary[0].OutsideCooldown | Should -Be 0
             $summary[1].Manager | Should -Be 'winget'
+            $summary[1].InstalledPackages | Should -Be 9
             $summary[1].UpgradeablePackages | Should -Be 2
             $summary[1].OutsideCooldown | Should -Be 1
             @(Get-ReportPackageManagerSummary -Packages @()).Count | Should -Be 0
+            @(Get-ReportPackageManagerSummary -Packages $packages)[0].InstalledPackages | Should -Be 'Unknown'
         }
     }
 
@@ -48,14 +51,14 @@ Describe 'Package manager summary' {
             $latest = [PackageVersion]::new('2.0', [datetime]::Now.AddDays(-10), 'Published', 'test')
             $package = [SoftwarePackage]::new('winget', 'demo', 'Demo', 'winget', $null, $installed, $latest, @([UpgradeTarget]::new($latest, 'upgrade demo')), $null)
             Mock Get-ReportPackageManagerSummary {
-                [pscustomobject]@{ Manager = 'winget'; UpgradeablePackages = 1; OutsideCooldown = 1 }
+                [pscustomobject]@{ Manager = 'winget'; InstalledPackages = 5; UpgradeablePackages = 1; OutsideCooldown = 1 }
             }
 
-            $output = (Write-ConsolePackageReport -Packages @($package) -CooldownHours 168 6>&1 | Out-String)
+            $output = (Write-ConsolePackageReport -Packages @($package) -InstalledCounts @{ winget = 5 } -CooldownHours 168 6>&1 | Out-String)
 
             $output | Should -Match '(?s)## Package manager summary.*?## Upgradeable packages \(sorted by software name\)'
             Assert-MockCalled Get-ReportPackageManagerSummary -Times 1 -Exactly -ParameterFilter {
-                $Packages.Count -eq 1 -and $CooldownHours -eq 168
+                $Packages.Count -eq 1 -and $InstalledCounts.winget -eq 5 -and $CooldownHours -eq 168
             }
         }
     }
@@ -106,6 +109,28 @@ Describe 'Outdated package report orchestration' {
             Assert-MockCalled Save-ReleaseDateCache -Times 1 -Exactly
             Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
                 $Packages.Count -eq 0 -and $CooldownHours -eq 48 -and $OutputFormat -eq 'Console' -and -not $OpenReport
+            }
+        }
+    }
+
+    It 'forwards installed counts with the collected packages to the report' {
+        InModuleScope PSPackageOutdatedReporter {
+            $cache = @{ schemaVersion = 1; entries = @{} }
+            Mock Get-ReleaseDateCache { $cache }
+            Mock Save-ReleaseDateCache {}
+            Mock Write-StageStatus {}
+            Mock Write-OutdatedPackageReport {}
+            Mock Get-WinGetUpgradeablePackages {
+                $InstalledCount.Value = 12
+                $installed = [PackageVersion]::new('1.0', $null, 'NotPublished', 'test')
+                $latest = [PackageVersion]::new('2.0', $null, 'NotPublished', 'test')
+                [SoftwarePackage]::new('winget', 'demo', 'Demo', 'winget', $null, $installed, $latest, @([UpgradeTarget]::new($latest, 'upgrade demo')), $null)
+            }
+
+            Invoke-OutdatedPackageReport -PackageManager WinGet -CachePath (Join-Path $TestDrive 'cache.json')
+
+            Assert-MockCalled Write-OutdatedPackageReport -Times 1 -Exactly -ParameterFilter {
+                $Packages.Count -eq 1 -and $InstalledCounts.winget -eq 12
             }
         }
     }

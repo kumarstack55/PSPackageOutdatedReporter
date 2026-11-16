@@ -2,6 +2,25 @@ $modulePath = Join-Path $PSScriptRoot '..\..\PSPackageOutdatedReporter.psm1'
 Import-Module $modulePath -Force
 
 Describe 'WinGet provider' {
+    It 'counts installed packages without filtering them by update or source' {
+        InModuleScope PSPackageOutdatedReporter {
+            function Get-WinGetPackage { [CmdletBinding()] param() }
+            Mock Get-Module { [pscustomobject]@{ Path = 'mock-module'; Version = [version]'1.0' } } -ParameterFilter { $ListAvailable }
+            Mock Import-Module {}
+            Mock Get-WinGetPackage {
+                [pscustomobject]@{ IsUpdateAvailable = $false; Source = 'winget' }
+                [pscustomobject]@{ IsUpdateAvailable = $false; Source = 'other' }
+            }
+            $count = $null
+
+            $result = @(Get-WinGetUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -SourceFilter winget -InstalledCount ([ref]$count))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 2
+            Assert-MockCalled Get-WinGetPackage -Times 1 -Exactly
+        }
+    }
+
     It 'builds a WinGet manifest URL' {
         Get-WinGetManifestUrl -PackageId 'Contoso.App' -Version '1.2.3' |
             Should -Be 'https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/c/Contoso/App/1.2.3/Contoso.App.yaml'

@@ -57,12 +57,14 @@ function Get-ReportPackagesWithOutOfCooldownTargets {
 function Get-ReportPackageManagerSummary {
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = $script:DefaultCooldownHours
+        [int]$CooldownHours = $script:DefaultCooldownHours,
+        [hashtable]$InstalledCounts = @{}
     )
 
     foreach ($group in ($Packages | Group-Object -Property PackageManagerId | Sort-Object Name)) {
         [pscustomobject]@{
             Manager = $group.Name
+            InstalledPackages = if ($null -ne $InstalledCounts[$group.Name]) { $InstalledCounts[$group.Name] } else { 'Unknown' }
             UpgradeablePackages = $group.Count
             OutsideCooldown = @(Get-ReportPackagesWithOutOfCooldownTargets -Packages $group.Group -CooldownHours $CooldownHours).Count
         }
@@ -75,7 +77,8 @@ function Write-OutdatedPackageReport {
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
         [int]$CooldownHours = $script:DefaultCooldownHours,
         [ValidateSet('Console', 'Html')][string]$OutputFormat = 'Console',
-        [switch]$OpenReport
+        [switch]$OpenReport,
+        [hashtable]$InstalledCounts = @{}
     )
 
     if ($OpenReport -and $OutputFormat -ne 'Html') {
@@ -83,7 +86,7 @@ function Write-OutdatedPackageReport {
     }
 
     if ($OutputFormat -eq 'Html') {
-        $reportPath = Write-HtmlPackageReport -Packages $Packages -CooldownHours $CooldownHours
+        $reportPath = Write-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
         Write-Host "HTML report saved to: $reportPath"
         if ($OpenReport) {
             Start-Process -FilePath $reportPath -ErrorAction Stop
@@ -91,14 +94,15 @@ function Write-OutdatedPackageReport {
         return
     }
 
-    Write-ConsolePackageReport -Packages $Packages -CooldownHours $CooldownHours
+    Write-ConsolePackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
 }
 
 function Write-ConsolePackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = $script:DefaultCooldownHours
+        [int]$CooldownHours = $script:DefaultCooldownHours,
+        [hashtable]$InstalledCounts = @{}
     )
 
     if ($Packages.Count -eq 0) {
@@ -117,7 +121,7 @@ function Write-ConsolePackageReport {
     $reportColumnNames = 'Manager', 'Name', 'InstalledVersion', 'InstalledVersionReleaseDate', 'InstalledVersionReleaseRelative', 'LatestVersion', 'LatestVersionReleaseDate', 'LatestVersionReleaseRelative'
 
     Write-Host '## Package manager summary'
-    Get-ReportPackageManagerSummary -Packages $Packages -CooldownHours $CooldownHours |
+    Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours |
         Format-Table -AutoSize |
         Out-String -Width 4096 |
         Out-Host

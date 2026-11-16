@@ -137,9 +137,11 @@ function Get-WinGetUpgradeablePackages {
         [Parameter(Mandatory)][hashtable]$Cache,
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
-        [string]$SourceFilter
+        [string]$SourceFilter,
+        [ref]$InstalledCount
     )
 
+    if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
     $module = Get-Module -ListAvailable Microsoft.WinGet.Client | Sort-Object Version -Descending | Select-Object -First 1
     if ($null -eq $module) {
         Write-Warning 'Microsoft.WinGet.Client is not installed. Run: Install-Module Microsoft.WinGet.Client -Scope CurrentUser'
@@ -151,7 +153,8 @@ function Get-WinGetUpgradeablePackages {
         Import-Module $module.Path -ErrorAction Stop
         Write-StageStatus 'WinGet: querying installed packages...'
         Add-InvocationLogEntry -Type ExternalCommand -Detail 'Get-WinGetPackage'
-        $installedPackages = Get-WinGetPackage -ErrorAction Stop
+        $installedPackages = @(Get-WinGetPackage -ErrorAction Stop)
+        if ($null -ne $InstalledCount) { $InstalledCount.Value = $installedPackages.Count }
     } catch {
         Write-Warning "Unable to query WinGet packages: $($_.Exception.Message)"
         return @()

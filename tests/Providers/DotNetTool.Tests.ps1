@@ -19,14 +19,32 @@ Describe 'dotnet tool provider' {
             }
             $cache = @{ schemaVersion = 1; entries = @{} }
 
-            $result = @(Get-DotNetToolUpgradeablePackages -Cache $cache -CacheTtlHours 24 -MaxUpgradeVersions 2)
+            $count = $null
+            $result = @(Get-DotNetToolUpgradeablePackages -Cache $cache -CacheTtlHours 24 -MaxUpgradeVersions 2 -InstalledCount ([ref]$count))
 
             $result.Count | Should -Be 1
+            $count | Should -Be 1
             $result[0].PackageManagerId | Should -Be 'dotnet-tool'
             $result[0].InstalledVersion.Version | Should -Be '1.0.0'
             $result[0].LatestVersion.Version | Should -Be '1.2.0'
             $result[0].UpgradeTargets.Count | Should -Be 1
             $result[0].UpgradeTargets[0].Command | Should -Be "dotnet tool update --global 'demo.tool' --version '1.2.0'"
+        }
+    }
+
+    It 'counts an empty list of globally installed tools as zero' {
+        InModuleScope PSPackageOutdatedReporter {
+            Mock Get-Command { [pscustomobject]@{ Name = 'dotnet' } }
+            Mock dotnet {
+                $global:LASTEXITCODE = 0
+                '{"version":1,"data":[]}'
+            }
+            $count = $null
+
+            $result = @(Get-DotNetToolUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 0
         }
     }
 

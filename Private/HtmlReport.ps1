@@ -38,7 +38,8 @@ function ConvertTo-HtmlPackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = $script:DefaultCooldownHours
+        [int]$CooldownHours = $script:DefaultCooldownHours,
+        [hashtable]$InstalledCounts = @{}
     )
 
     $entries = @()
@@ -191,10 +192,11 @@ function ConvertTo-HtmlPackageReport {
     }
 
     $null = $builder.AppendLine('<h2 id="package-manager-summary">Package manager summary</h2>')
-    $null = $builder.AppendLine('<table><thead><tr><th>Manager</th><th>Upgradeable packages</th><th>Outside cooldown</th></tr></thead><tbody>')
-    foreach ($summary in (Get-ReportPackageManagerSummary -Packages $Packages -CooldownHours $CooldownHours)) {
+    $null = $builder.AppendLine('<table><thead><tr><th>Manager</th><th>Installed packages</th><th>Upgradeable packages</th><th>Outside cooldown</th></tr></thead><tbody>')
+    foreach ($summary in (Get-ReportPackageManagerSummary -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours)) {
         $manager = ConvertTo-HtmlReportText -Value $summary.Manager
-        $null = $builder.AppendLine("<tr><td>$manager</td><td>$($summary.UpgradeablePackages)</td><td>$($summary.OutsideCooldown)</td></tr>")
+        $installed = ConvertTo-HtmlReportText -Value ([string]$summary.InstalledPackages)
+        $null = $builder.AppendLine("<tr><td>$manager</td><td>$installed</td><td>$($summary.UpgradeablePackages)</td><td>$($summary.OutsideCooldown)</td></tr>")
     }
     $null = $builder.AppendLine('</tbody></table>')
 
@@ -335,7 +337,8 @@ function Write-HtmlPackageReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][AllowEmptyCollection()][SoftwarePackage[]]$Packages,
-        [int]$CooldownHours = $script:DefaultCooldownHours
+        [int]$CooldownHours = $script:DefaultCooldownHours,
+        [hashtable]$InstalledCounts = @{}
     )
 
     $reportPath = Get-HtmlReportPath
@@ -344,7 +347,7 @@ function Write-HtmlPackageReport {
 
     $temporaryPath = Join-Path $reportDirectory ([IO.Path]::GetRandomFileName())
     try {
-        $html = ConvertTo-HtmlPackageReport -Packages $Packages -CooldownHours $CooldownHours
+        $html = ConvertTo-HtmlPackageReport -Packages $Packages -InstalledCounts $InstalledCounts -CooldownHours $CooldownHours
         $encoding = [System.Text.UTF8Encoding]::new($false)
         [IO.File]::WriteAllText($temporaryPath, $html, $encoding)
         Move-Item -LiteralPath $temporaryPath -Destination $reportPath -Force -ErrorAction Stop

@@ -2,6 +2,46 @@
 Import-Module $modulePath -Force
 
 Describe 'Chocolatey provider' {
+    It 'counts installed packages independently of outdated packages' {
+        InModuleScope PSPackageOutdatedReporter {
+            function choco {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'choco' } } -ParameterFilter { $Name -eq 'choco' }
+            Mock choco {
+                $global:LASTEXITCODE = 0
+                if ($args[0] -eq 'list') { 'one|1.0'; 'two|2.0' }
+            }
+            $count = $null
+
+            $result = @(Get-ChocolateyUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count))
+
+            $result.Count | Should -Be 0
+            $count | Should -Be 2
+        }
+    }
+
+    It 'warns and leaves the count unknown when the installed list fails' {
+        InModuleScope PSPackageOutdatedReporter {
+            function choco {}
+            Mock Get-Command { [pscustomobject]@{ Name = 'choco' } } -ParameterFilter { $Name -eq 'choco' }
+            Mock choco {
+                $global:LASTEXITCODE = if ($args[0] -eq 'list') { 1 } else { 0 }
+                if ($args[0] -eq 'outdated') { 'demo|1.0|2.0|false' }
+            }
+            Mock Get-ChocolateyAvailableVersions { @('2.0') }
+            Mock Resolve-ChocolateyReleaseDate { [PackageVersion]::new($Version, $null, 'NotPublished', 'test') }
+            Mock Resolve-ChocolateyInfoUrl { '' }
+            Mock Write-Warning {}
+            $count = 9
+
+            $result = @(Get-ChocolateyUpgradeablePackages -Cache @{} -CacheTtlHours 24 -MaxUpgradeVersions 1 -InstalledCount ([ref]$count))
+
+            $count | Should -BeNullOrEmpty
+            $result.Count | Should -Be 1
+            $result[0].PackageId | Should -Be 'demo'
+            Assert-MockCalled Write-Warning -Times 1 -ParameterFilter { $Message -like '*count installed Chocolatey packages*' }
+        }
+    }
+
     It 'builds upgrade commands with escaped arguments' {
         New-ChocolateyUpgradeCommand -PackageId "O'Reilly.App" -Version '1.2.3' |
             Should -Be "choco upgrade 'O''Reilly.App' --version '1.2.3' --yes"

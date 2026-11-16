@@ -77,17 +77,20 @@ function Invoke-OutdatedPackageReport {
     Write-StageStatus 'Loading release date cache...'
     $cache = Get-ReleaseDateCache -Path $CachePath -Clear:$ClearCache
     $packages = [System.Collections.Generic.List[SoftwarePackage]]::new()
+    $installedCounts = @{}
     foreach ($provider in $providers) {
         Write-StageStatus "Checking $($provider.DisplayName) packages..."
-        foreach ($package in @(& $provider.CollectorCommand -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source)) {
+        $installedCount = $null
+        foreach ($package in @(& $provider.CollectorCommand -Cache $cache -CacheTtlHours $CacheTtlHours -MaxUpgradeVersions $MaxUpgradeVersions -SourceFilter $Source -InstalledCount ([ref]$installedCount))) {
             $packages.Add($package)
+            $installedCounts[$package.PackageManagerId] = $installedCount
         }
     }
 
     Write-StageStatus 'Saving release date cache...'
     Save-ReleaseDateCache -Cache $cache -Path $CachePath
     Write-StageStatus 'Rendering report...'
-    Write-OutdatedPackageReport -Packages $packages.ToArray() -CooldownHours $CooldownHours -OutputFormat $OutputFormat -OpenReport:$OpenReport
+    Write-OutdatedPackageReport -Packages $packages.ToArray() -InstalledCounts $installedCounts -CooldownHours $CooldownHours -OutputFormat $OutputFormat -OpenReport:$OpenReport
     $global:LASTEXITCODE = 0
 }
 

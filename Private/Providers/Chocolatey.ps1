@@ -138,9 +138,11 @@ function Get-ChocolateyUpgradeablePackages {
         [Parameter(Mandatory)][hashtable]$Cache,
         [Parameter(Mandatory)][int]$CacheTtlHours,
         [Parameter(Mandatory)][int]$MaxUpgradeVersions,
-        [string]$SourceFilter
+        [string]$SourceFilter,
+        [ref]$InstalledCount
     )
 
+    if ($null -ne $InstalledCount) { $InstalledCount.Value = $null }
     if ($null -eq (Get-Command choco -ErrorAction SilentlyContinue)) {
         Write-Warning 'Chocolatey is not installed or is not on PATH.'
         return @()
@@ -149,6 +151,25 @@ function Get-ChocolateyUpgradeablePackages {
     $candidateSource = 'chocolatey'
     if (-not [string]::IsNullOrWhiteSpace($SourceFilter) -and $candidateSource -ine $SourceFilter) {
         return @()
+    }
+
+    if ($null -ne $InstalledCount) {
+        try {
+            Write-StageStatus 'Chocolatey: querying installed packages...'
+            Add-InvocationLogEntry -Type ExternalCommand -Detail 'choco list --local-only'
+            $installedLines = @(choco list --local-only --no-color --limit-output 2>$null)
+            if ($LASTEXITCODE -ne 0) {
+                throw "choco list exited with code $LASTEXITCODE."
+            }
+            foreach ($line in $installedLines) {
+                if ($line -notmatch '^[^|\s][^|]*\|[^|\s][^|]*$') {
+                    throw "choco list returned an unexpected record: $line"
+                }
+            }
+            $InstalledCount.Value = $installedLines.Count
+        } catch {
+            Write-Warning "Unable to count installed Chocolatey packages: $($_.Exception.Message)"
+        }
     }
 
     try {
