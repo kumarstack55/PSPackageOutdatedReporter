@@ -30,6 +30,7 @@ Describe 'HTML package report' {
             $html | Should -Match 'class="command-line"'
             $html | Should -Match 'class="copy-button" data-command="winget upgrade &lt;demo&gt;"'
             $html | Should -Match '\.command-line\s*\{[^}]*background:\s*#1e1e1e;\s*color:\s*#f5f5f5;'
+            $html | Should -Match '\.package:target\s*\{[^}]*background:\s*#fff8cc;[^}]*outline:\s*3px solid #d6a800;[^}]*outline-offset:\s*0?\.3rem;[^}]*scroll-margin-top:\s*1rem;'
             $html | Should -Match '\.command-line\s*\{[^}]*gap:\s*0?\.3rem;[^}]*padding:\s*0?\.2rem\s+0?\.4rem;'
             $html | Should -Match '\.copy-button\s*\{[^}]*padding:\s*0\s+0?\.2rem;'
             $html | Should -Match '\.command-line\s*\{[^}]*display:\s*inline-flex;\s*vertical-align:\s*middle;'
